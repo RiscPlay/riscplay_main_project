@@ -1,0 +1,34 @@
+<?xml version="1" encoding="UTF-8"?>
+<!DOCTYPE gowin-fpga-project>
+<Project>
+    <Template>FPGA</Template>
+    <Version>5</Version>
+    <Device name="GW2AR-18C" pn="GW2AR-LV18QN88C8/I7">gw2ar18c-000</Device>
+    <FileList>
+        <File path="src/control_cpu/control_cpu_clock.sv" type="file.verilog" enable="1"/>
+        <File path="src/control_cpu/shutdown_and_start_cpu.sv" type="file.verilog" enable="1"/>
+        <File path="src/control_cpu/control_cpu.sv" type="file.verilog" enable="1"/>
+        <File path="src/dvi_tx/dvi_tx.v" type="file.verilog" enable="1"/>
+        <File path="src/gowin_rpll/TMDS_rPLL.v" type="file.verilog" enable="1"/>
+        <File path="src/gowin_rpll/gowin_rpll__vco_div_8__clkin_div_3__clkfb_div_10__clkoutp_90_degree.v" type="file.verilog" enable="1"/>
+        <File path="src/gowin_rpll/gowin_rpll__voc_div_8__clkin_div_3___clkfb_div_10__clkoutp_90.v" type="file.verilog" enable="1"/>
+        <File path="src/gowin_rpll/gowin_rpll__voc_div_8__clkin_div_3___clkfb_div_8__clkoutp_90.v" type="file.verilog" enable="1"/>
+        <File path="src/gowin_sp/gowin_sp_sram_main_memory.v" type="file.verilog" enable="1"/>
+        <File path="src/io_mem/mapper.v" type="file.verilog" enable="1"/>
+        <File path="src/io_mem/recvdata.v" type="file.verilog" enable="1"/>
+        <File path="src/io_mem/senddata.v" type="file.verilog" enable="1"/>
+        <File path="src/control_leds/control_leds.v" type="file.verilog" enable="1"/>
+        <File path="src/math_modules/fibonacci/fibonacci.v" type="file.verilog" enable="1"/>
+        <File path="src/ppu/hdmi.v" type="file.verilog" enable="1"/>
+        <File path="src/ppu/testpattern.v" type="file.verilog" enable="1"/>
+        <File path="src/riscvrv32im/cpu__riscvrv32im.sv" type="file.verilog" enable="1"/>
+        <File path="src/spi/consumer_spi.v" type="file.verilog" enable="1"/>
+        <File path="src/spi/spi_slave.v" type="file.verilog" enable="1"/>
+        <File path="src/top.sv" type="file.verilog" enable="1"/>
+        <File path="src/util/crc32_fsm.v" type="file.verilog" enable="1"/>
+        <File path="src/util/fifo.v" type="file.verilog" enable="1"/>
+        <File path="src/util/hex_to_7seg_de1soc.v" type="file.verilog" enable="1"/>
+        <File path="src/pins.cst" type="file.cst" enable="1"/>
+        <File path="src/riscplay_main_project.sdc" type="file.sdc" enable="1"/>
+    </FileList>
+</Project>

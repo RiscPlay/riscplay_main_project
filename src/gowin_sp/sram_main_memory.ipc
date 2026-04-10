@@ -1,0 +1,16 @@
+[General]
+ipc_version=4
+file=sram_main_memory
+module=Gowin_SP_SRAM_MAIN_MEMORIY
+target_device=gw2ar18c-000
+type=ram_sp
+version=3.0
+
+[Config]
+BYTE_SIZE=0
+DEPTH=12
+LANG=0
+READ=0
+RESET_MODE=true
+WIDTH=32
+WRITE=0

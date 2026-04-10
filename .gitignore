@@ -1,0 +1,9 @@
+*.log
+*.bin
+*.binx
+*.db
+*.rpt.txt
+rtl_parser_arg.json
+*.result
+sdram_control
+impl/*

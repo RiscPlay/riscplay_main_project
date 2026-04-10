@@ -1,0 +1,34 @@
+-series GW2AR
+-device GW2AR-18
+-device_version C
+-package QFN88
+-part_number GW2AR-LV18QN88C8/I7
+
+
+-mod_name Gowin_rPLL___67Dot5mhz
+-file_name gowin_rpll__voc_div_8__clkin_div_3___clkfb_div_10__clkoutp_90
+-path C:/Users/kite/workspace/riscplay_main_project/src/gowin_rpll/
+-type PLL
+-rPll true
+-file_type vlg
+-dev_type GW2AR-18C
+-dyn_idiv_sel false
+-idiv_sel 2
+-dyn_fbdiv_sel false
+-fbdiv_sel 5
+-dyn_odiv_sel false
+-odiv_sel 16
+-dyn_da_en false
+-rst_sig false
+-rst_sig_p false
+-fclkin 31
+-clkfb_sel 0
+-en_lock false
+-clkout_bypass false
+-en_clkoutp true
+-clkoutp_bypass false
+-psda_sel 4
+-dutyda_sel 8
+-en_clkoutd false
+-clkoutd_bypass false
+-en_clkoutd3 false

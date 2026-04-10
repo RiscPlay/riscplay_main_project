@@ -1,0 +1,2 @@
+# C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\gw_sh.exe .\compile.tcl
+C:\Gowin\Gowin_V1.9.11.03_Education_x64\Programmer\bin\programmer_cli.exe --device GW2AR-18C --cable-index 1 --operation_index 2  --fsFile  $PWD\impl\pnr\riscplay_main_project.fs
