@@ -2,14 +2,56 @@ module rv32im_cpu(
     input clk,
     input reset,
 
-    output wire [31:0] mem_addr,
-    output reg [31:0] mem_wdata,
-    input      [31:0] mem_rdata,
-    output reg mem_we,
-    input wire enable
-  );
+    output wire [31:0] mem_addr___external,
+    output wire [31:0] mem_wdata___external,
+    input  wire  [31:0] mem_rdata___external,
+    output wire      mem_we___external,
+    input wire enable,
 
-  reg [3:0] time_that_stage_hold;
+
+
+
+    output  reg    [5:0]   leds,
+    output  reg    [31:0]  pc_out  
+  );
+  
+
+  reg  [31:0]  mem_addr;
+  reg  [31:0]  mem_wdata;
+  wire [31:0]  mem_rdata;
+  reg          mem_we;
+  reg          mem_we_byte;
+  reg          mem_we_half;
+  reg  [7:0]  mem_rdata_byte;
+  reg  [15:0] mem_rdata_half;
+  reg   [7:0]  mem_wdata_byte;
+  reg   [15:0] mem_wdata_half;
+  wire memory_control___busy;
+
+  memory_control memory_control_ins(
+    .clk(clk),
+    .mem_addr___from_cpu(mem_addr___external),
+    .mem_wdata___from_cpu(mem_wdata___external),
+    .mem_rdata___from_cpu(mem_rdata___external),
+    .mem_we___from_cpu(mem_we___external),
+    
+    .mem_addr(mem_addr),
+    .mem_wdata(mem_wdata),
+    .mem_rdata(mem_rdata),
+    .mem_we(mem_we),
+    .mem_we_byte(mem_we_byte),
+    .mem_we_half(mem_we_half),
+
+    .mem_rdata_byte(mem_rdata_byte),
+    .mem_rdata_half(mem_rdata_half),
+
+    .mem_wdata_byte(mem_wdata_byte),
+    .mem_wdata_half(mem_wdata_half),
+    .reset(reset),
+    .busy(memory_control___busy)
+);
+
+  reg [7:0] time_that_stage_hold;
 
   reg [31:0] pc;
   reg [31:0] instr;
@@ -27,11 +69,11 @@ module rv32im_cpu(
   reg [3:0] state_prev;
 
   localparam
-    FETCH     = 4'h0,
-    DECODE    = 4'h1,
-    EXECUTE   = 4'h2,
-    MEMORY    = 4'h3,
-    WRITEBACK = 4'h4,
+    FETCH       = 4'h0,
+    DECODE      = 4'h1,
+    EXECUTE     = 4'h2,
+    MEMORY      = 4'h3,
+    WRITEBACK   = 4'h4,
     STATE_RESET = 4'hf;
 
   wire [6:0] opcode = instr[6:0];
@@ -51,84 +93,123 @@ module rv32im_cpu(
   reg write_in_register;
 
   wire sync__state=state_prev==state;
-  reg [31:0] word_addr;
-  assign mem_addr=word_addr>>2;
-
+  `ifndef SIM
   `include "alu_defines.vh"
+  `endif
+  `ifdef SIM
+  `include "riscvrv32im/alu_defines.vh"
+  `endif
   always @(posedge clk) begin
     if(reset==1'b0) begin
         if(sync__state) begin
-            if(time_that_stage_hold<4'hf) begin
-                time_that_stage_hold<=time_that_stage_hold+4'h1;
+            if(time_that_stage_hold<8'hff) begin
+                time_that_stage_hold<=time_that_stage_hold+8'h01;
             end
         end
         else begin
-            time_that_stage_hold<=4'h0;
+            time_that_stage_hold<=8'h00;
         end
         state_prev<=state;
     end
     else begin 
-      time_that_stage_hold<=4'h0;
+      time_that_stage_hold<=8'h00;
       state_prev<=STATE_RESET;
     end
   end
+  
   always @(posedge clk)
   begin
-
+    //pc_out<=pc;
     if(reset)
     begin
+      leds<=6'b000000;
       pc <= 32'h80000000;
       state <= FETCH;
       branch_taken<=1'b0;
       write_in_register<=1'b0;
-      mem_we   <= 0;
+      mem_we   <= 1'b0;
+      mem_we_byte<= 1'b0;
+      mem_we_half<=1'b0;
+      mem_addr <= 32'h80000000;
+      leds<=6'b111111;
     end
 
     else if(enable) begin
       case(state)
 
         FETCH:begin
-          word_addr <= pc;
-          mem_we   <= 0;
-          state <= DECODE;
+          
+            mem_addr <= pc;
+            regfile[5'b00000]<=32'h00000000;
+            mem_we   <= 0;
+            mem_we_byte<=0;
+            mem_we_half<=0;
+            alu_result<=32'h00000000;
+            branch_taken<=1'b0;
+            if(sync__state & time_that_stage_hold>8'h07) begin
+              state <= DECODE;
+              instr <= mem_rdata;
+            end
         end
-
         DECODE: begin
-          instr <= mem_rdata;
-
           rs1_val <= regfile[rs1];
           rs2_val <= regfile[rs2];
           rd <= instr[11:7];
           write_in_register<=1'b0;
-          state <= EXECUTE;
+          if(sync__state & time_that_stage_hold>8'h05) begin
+            state <= EXECUTE;
+          end
         end
 
         EXECUTE: begin
           case(opcode)
             7'b0000011: begin
-              word_addr <= rs1_val + imm_i;
-              mem_we   <= 1'b0;
-              state    <= MEMORY;
+              mem_addr <= rs1_val + imm_i;
+              if(sync__state & time_that_stage_hold>8'h08 & (~memory_control___busy)) begin
+                state    <= MEMORY;
+              end
             end
             7'b0100011: begin
+              `ifndef SIM
               `include "store.vh"
-              state    <= MEMORY;
-              mem_we<=1'b1;
+              `endif
+              `ifdef SIM
+              `include "riscvrv32im/store.vh"
+              `endif
+              if(sync__state & time_that_stage_hold>8'h08 & (~memory_control___busy)) begin
+                state<= MEMORY;
+              end
 
             end
             7'b0010011: begin
+              `ifndef SIM
               `include "alu_im.vh"
+              `endif
+              `ifdef SIM
+              `include "riscvrv32im/alu_im.vh"
+              `endif
               state <= WRITEBACK;
               write_in_register<=1'b1;
 
             end
             7'b0110011: begin
+              `ifndef SIM
               `include "alu.vh"
+              `endif
+              `ifdef SIM
+              `include "riscvrv32im/alu.vh"
+              `endif
               state <= WRITEBACK;
               write_in_register<=1'b1;
             end
             7'b1100011: begin
+              `ifndef SIM
               `include "branch.vh"
+              `endif
+              `ifdef SIM
+              `include "riscvrv32im/branch.vh"
+              `endif
+
               state <= WRITEBACK;
             end
             7'b1100111: begin //JALR
@@ -147,6 +228,7 @@ module rv32im_cpu(
               alu_result <= imm_u;
               write_in_register<=1'b1;
               state <= WRITEBACK;
+
             end
             7'b0010111: begin //AUIPC
               alu_result <= pc + imm_u;
@@ -166,21 +248,27 @@ module rv32im_cpu(
 
         MEMORY: begin
           case(opcode)
-            7'b0000011: begin 
+            7'b0000011: begin
+              `ifndef SIM
               `include "load.vh"
+              `endif 
+              `ifdef SIM
+              `include "riscvrv32im/load.vh"
+              `endif 
               write_in_register<=1'b1;
             end
-            7'b0100011: begin
-              mem_we<=1'b0;
-            end
           endcase
-          if(sync__state & time_that_stage_hold>4'h1) begin
+          if(sync__state & time_that_stage_hold>8'h01 ) begin
+              mem_we<=1'b0;
+              mem_we_byte<=1'b0;
+              mem_we_half<=1'b0;
+          end
+          if(sync__state & time_that_stage_hold>8'h08 & (~memory_control___busy)) begin
               state <= WRITEBACK;
           end
         end
 
         WRITEBACK: begin
-
           if((rd != 0) & write_in_register)
             regfile[rd] <= alu_result;
           case (opcode)
@@ -193,7 +281,7 @@ module rv32im_cpu(
 
             7'b1100111: begin //JALR
               if(funct3==3'b000) 
-                pc <= (rs1_val + imm_i) &  ~32'h3;
+                pc <= (rs1_val + imm_i) &  ~32'h1;
               else 
                 pc <= pc + 32'h00000004;
             end
@@ -213,143 +301,3 @@ module rv32im_cpu(
   end
 
 endmodule
-
-
-/****
-#Opcodes do riscv
-
-| opcode   | binário   | função                               |
-| -------- | --------- | ------------------------------------ |
-| LOAD     | `0000011` |load from memory                      |
-| STORE    | `0100011` | escrever na memória                  |
-| OP-IMM   | `0010011` | ALU com imediato                     |
-| OP       | `0110011` | ALU entre registradores + extensão M |
-| BRANCH   | `1100011` | desvios condicionais                 |
-| JALR     | `1100111` | salto indireto                       |
-| JAL      | `1101111` | salto                                |
-| LUI      | `0110111` | carregar imediato alto               |
-| AUIPC    | `0010111` | PC + imediato                        |
-| SYSTEM   | `1110011` | ecall / ebreak                       |
-| MISC-MEM | `0001111` | fence (opcional)                     |
-
-****/
-
-
-/*****
-Terminação dos imediatos e onde são usados em cada grupo de instruções
-| formato | usado em           |
-| ------- | ------------------ |
-| I       | ALU imediato, LOAD |
-| S       | STORE              |
-| B       | BRANCH             |
-| U       | LUI / AUIPC        |
-| J       | JAL                |
-
-*****/
-
-/***
-#LOAD
-| funct3 | Instrução | Operação                                       |
-| ------ | --------- | ---------------------------------------------- |
-| 000    | LB        | rd = Mem[rs1 + imm][7:0]  (byte com sinal)     |
-| 001    | LH        | rd = Mem[rs1 + imm][15:0] (halfword com sinal) |
-| 010    | LW        | rd = Mem[rs1 + imm][31:0] (word)               |
-| 100    | LBU       | rd = Mem[rs1 + imm][7:0]  (byte unsigned)      |
-| 101    | LHU       | rd = Mem[rs1 + imm][15:0] (halfword unsigned)  |
-***/
-
-/***
-#STORE
-| funct3 | Instrução | Operação                                        |
-| ------ | --------- | ----------------------------------------------- |
-| 000    | SB        | Mem[rs1 + imm] = rs2[7:0]      (store byte)     |
-| 001    | SH        | Mem[rs1 + imm] = rs2[15:0]     (store halfword) |
-| 010    | SW        | Mem[rs1 + imm] = rs2[31:0]     (store word)     |
-
-***/
-
-/*****
-#OP-IMM
-
-| funct3 | funct7 / imm[11:5] | Instrução | Operação                            |
-| ------ | ------------------ | --------- | ----------------------------------- |
-| 000    | –                  | ADDI      | rd = rs1 + imm                      |
-| 010    | –                  | SLTI      | rd = (rs1 < imm) ? 1 : 0 (signed)   |
-| 011    | –                  | SLTIU     | rd = (rs1 < imm) ? 1 : 0 (unsigned) |
-| 100    | –                  | XORI      | rd = rs1 ^ imm                      |
-| 110    | –                  | ORI       | rd = rs1 | imm                      |
-| 111    | –                  | ANDI      | rd = rs1 & imm                      |
-| 001    | 0000000            | SLLI      | rd = rs1 << shamt                   |
-| 101    | 0000000            | SRLI      | rd = rs1 >> shamt (lógico)          |
-| 101    | 0100000            | SRAI      | rd = rs1 >>> shamt (aritmético)     |
-
-
-/*****
-#OP
-| funct3 | funct7  | instrução | operação                         |
-| ------ | ------- | --------- | -------------------------------- |
-| 000    | 0000000 | ADD       | `rd = rs1 + rs2`                 |
-| 000    | 0100000 | SUB       | `rd = rs1 - rs2`                 |
-| 001    | 0000000 | SLL       | `rd = rs1 << rs2[4:0]`           |
-| 010    | 0000000 | SLT       | `rd = (signed rs1 < signed rs2)` |
-| 011    | 0000000 | SLTU      | `rd = (rs1 < rs2)` unsigned      |
-| 100    | 0000000 | XOR       | `rd = rs1 ^ rs2`                 |
-| 101    | 0000000 | SRL       | `rd = rs1 >> rs2[4:0]`           |
-| 101    | 0100000 | SRA       | `rd = rs1 >>> rs2[4:0]`          |
-| 110    | 0000000 | OR        | `rd = rs1 \| rs2`                |
-| 111    | 0000000 | AND       | `rd = rs1 & rs2`                 |
-***/
-
-/***
-#BRANCH
-| funct3 | Instruction | Condition                         | What happens                                        |
-| ------ | ----------- | --------------------------------- | --------------------------------------------------- |
-| 000    | BEQ         | branch if `rs1 == rs2`            | If true: `pc = pc + imm_b`; if false: `pc = pc + 4` |
-| 001    | BNE         | branch if `rs1 != rs2`            | If true: `pc = pc + imm_b`; if false: `pc = pc + 4` |
-| 100    | BLT         | branch if `rs1 < rs2` (signed)    | If true: `pc = pc + imm_b`; if false: `pc = pc + 4` |
-| 101    | BGE         | branch if `rs1 >= rs2` (signed)   | If true: `pc = pc + imm_b`; if false: `pc = pc + 4` |
-| 110    | BLTU        | branch if `rs1 < rs2` (unsigned)  | If true: `pc = pc + imm_b`; if false: `pc = pc + 4` |
-| 111    | BGEU        | branch if `rs1 >= rs2` (unsigned) | If true: `pc = pc + imm_b`; if false: `pc = pc + 4` |
-
-***/
-/***
-#JALR
-| funct3 | Instruction | Operation              | What happens                             |
-| ------ | ----------- | ---------------------- | ---------------------------------------- |
-| 000    | JALR        | Jump and link register | `rd = pc + 4`; `pc = (rs1 + imm_i) & ~1` |
-***/
-
-/***
-#JAL
-| funct3 | Instruction | Operation     | What happens                     |
-| ------ | ----------- | ------------- | -------------------------------- |
-| —      | JAL         | Jump and link | `rd = pc + 4`; `pc = pc + imm_j` |
-***/
-
-/***
-#LUI
-| funct3 | Instruction | Operation            | What happens |
-| ------ | ----------- | -------------------- | ------------ |
-| —      | LUI         | Load upper immediate | `rd = imm_u` |
-***/
-
-
-/***
-#AUIPC
-| funct3 | Instruction | Operation                 | What happens      |
-| ------ | ----------- | ------------------------- | ----------------- |
-| —      | AUIPC       | Add upper immediate to PC | `rd = pc + imm_u` |
-***/
-
-/***
-riscv32-unknown-elf-gcc \
--march=rv32im \
--mabi=ilp32 \
--O2 \
--nostdlib \
--nostartfiles \
--Wl,--no-relax, --gc-sections \
--o program.elf program.c
-
-riscv32-unknown-elf-objcopy -O binary program.elf program.bin
-***/

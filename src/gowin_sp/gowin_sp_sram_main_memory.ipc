@@ -14,3 +14,4 @@ READ=0
 RESET_MODE=true
 WIDTH=32
 WRITE=0
+MEM_FILE=../../tests/test_assembly/test_load_hw_sw.mi

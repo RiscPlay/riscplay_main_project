@@ -1,7 +1,12 @@
 `ifndef MODULES____DEFINES_TO_A_MODULE_CONNECT_TO__CONSUMER_SPI_0__OF_TOP_LEVEL____DEFINE_MUX___V
 `define MODULES____DEFINES_TO_A_MODULE_CONNECT_TO__CONSUMER_SPI_0__OF_TOP_LEVEL____DEFINE_MUX___V
 
+`ifndef SIM
 `include "define_ids.vh"
+`endif
+`ifdef SIM
+`include "defines_to_a_module_connect_to__consumer_spi_0__of_top_level/define_ids.vh"
+`endif
 //`include "modules/defines_to_a_module_connect_to__consumer_spi_0__of_top_level/define_ids.vh"
 `define MUX_COMB__FOR_MODULES(input_signal,mux_array)\
 assign mux_array[ID_MODULE____SPI___CONSUMER_SPI] = \

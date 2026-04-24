@@ -5,20 +5,17 @@
 //Part Number: GW2AR-LV18QN88C8/I7
 //Device: GW2AR-18
 //Device Version: C
-//Created Time: Tue Apr 21 01:30:58 2026
+//Created Time: Mon Apr 20 01:09:04 2026
 
 //Change the instance name and port connections to the signal names
 //--------Copy here to design--------
 
-    Gowin_SP_SRAM_MAIN_MEMORY your_instance_name(
-        .dout(dout), //output [31:0] dout
-        .clk(clk), //input clk
-        .oce(oce), //input oce
-        .ce(ce), //input ce
-        .reset(reset), //input reset
-        .wre(wre), //input wre
-        .ad(ad), //input [11:0] ad
-        .din(din) //input [31:0] din
+    Gowin_rPLL your_instance_name(
+        .clkout(clkout), //output clkout
+        .lock(lock), //output lock
+        .clkoutp(clkoutp), //output clkoutp
+        .clkoutd(clkoutd), //output clkoutd
+        .clkin(clkin) //input clkin
     );
 
 //--------Copy end-------------------

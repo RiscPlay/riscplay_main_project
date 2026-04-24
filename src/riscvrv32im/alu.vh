@@ -19,4 +19,6 @@ case(funct3)
     end
     3'b110: alu_result <= rs1_val | rs2_val;                                         // OR
     3'b111: alu_result <= rs1_val & rs2_val;                                         // AND
+    default:            alu_result <= 32'h00000000;
+
 endcase

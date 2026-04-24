@@ -5,6 +5,8 @@
 #include <Arduino.h>
 #include "spi_pins.h"
 #include <SPI.h>
+#define OP___SEND_MEMORY_TO_RISCV 2
+#define OP___RECV_MEMORY_FROM_RISCV 3
 
 
 uint32_t calc_crc(uint8_t *data_in, int len){
@@ -110,10 +112,10 @@ bool shutdown_or_up_processor(bool enable){
   return check_if_data_was_sent_with_success(crc_out);
 }
 
-bool send_header_to____fpga_comm_over_spi(uint32_t addr,uint32_t len){
+bool send_header_to____fpga_comm_over_spi(uint8_t op,uint32_t addr,uint32_t len){
   uint8_t header[9];
   uint8_t crc_out[4];
-  header[0] =2;
+  header[0] =op;
   header[1] =0;
   header[2] =0; 
   header[3] =(uint8_t)((addr>>24)&UINT32_C(255));   
@@ -148,6 +150,7 @@ bool send_body_to____fpga_comm_over_spi(uint8_t *body,uint32_t len){
   uint32_to_vector_uint8(crc_out_uint32, crc_out);
   //delay(50);
   for(int i=0;i<len;i++){
+    
     SPI.transfer(body[i]);
   }
   delay(1);
@@ -155,14 +158,37 @@ bool send_body_to____fpga_comm_over_spi(uint8_t *body,uint32_t len){
   Serial.println("send_body_to____fpga_comm_over_spi");
   #endif
   return check_if_data_was_sent_with_success(crc_out);
+}
 
+bool recv_body_from____fpga_comm_over_spi(uint8_t *body,uint32_t len){
+  uint8_t crc_in[4];
+  uint8_t crc_out[4];
  
+ 
+  //delay(50);
+  for(int i=0;i<len;i++){
+    body[i]=SPI.transfer(0);
+  }
+  uint32_t crc_out_uint32=calc_crc(body, len);
+  uint32_to_vector_uint8(crc_out_uint32, crc_out);
+  delay(1);
+  
+  #ifdef LOG__SPI_COMM
+  Serial.println("recv_body_from____fpga_comm_over_spi");
+  #endif
+  return check_if_data_was_sent_with_success(crc_out);
 }
 bool send_uint8_vector_to_fpga(uint32_t addr,uint8_t *body,uint32_t length){
+  /*uint8_t body_v[256];
+  for(int i=0;i<(length/4);i++){
+    for(int j=0;j<4;j++){
+      body_v[(i*4)+(3-j)]=body[(i*4)+j];
+    }
+  }*/
   SPI.beginTransaction(SPISettings(6000000, MSBFIRST, SPI_MODE0));
   digitalWrite(CS, LOW); // CS começa HIGH
   delayMicroseconds(10);
-  bool success=send_header_to____fpga_comm_over_spi(addr,length); 
+  bool success=send_header_to____fpga_comm_over_spi(OP___SEND_MEMORY_TO_RISCV,addr,length); 
   if(success)
     success=send_body_to____fpga_comm_over_spi(body,length);
   delayMicroseconds(10);
@@ -170,6 +196,21 @@ bool send_uint8_vector_to_fpga(uint32_t addr,uint8_t *body,uint32_t length){
   SPI.endTransaction();
   return success;
 }
+
+
+bool recv_uint8_vector_from_fpga(uint32_t addr,uint8_t *body,uint32_t length){
+  SPI.beginTransaction(SPISettings(6000000, MSBFIRST, SPI_MODE0));
+  digitalWrite(CS, LOW); // CS começa HIGH
+  delayMicroseconds(10);
+  bool success=send_header_to____fpga_comm_over_spi(OP___RECV_MEMORY_FROM_RISCV,addr,length); 
+  if(success)
+    success=recv_body_from____fpga_comm_over_spi(body,length);
+  delayMicroseconds(10);
+  digitalWrite(CS, HIGH);
+  SPI.endTransaction();
+  return success;
+}
+
 
 
 bool shutdown_or_up_processor_v2(bool enable){

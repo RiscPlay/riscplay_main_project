@@ -4,7 +4,6 @@ module top (
     output     [5:0]  led,
     inout      [3:0]  GPIO,
     input             I_rst           ,
-    input             I_key           ,
     output            O_tmds_clk_p    ,
     output            O_tmds_clk_n    ,
     output     [2:0]  O_tmds_data_p   ,//{r,g,b}
@@ -28,18 +27,29 @@ module top (
 ***/
 );
 
+
+`include "defines_to_use_clocks.vh"
+
 wire clk;
-wire clk_90d;
-reg lock_pll_90mhz=1'b0;
-Gowin_rPLL___90mhz main_clock_used(
-     .clkout(clk), //output clkout
-     .clkoutp(clk_90d),
-     .lock(lock_pll_90mhz),
-     .clkin(I_clk) //input clkin
+wire lock_pll;
+wire clkoutp;
+pll ppl_ins (
+    .clkin(I_clk),
+    .clkout(clk),
+    .lock(lock_pll),
+    .clkoutp(clkoutp)
 );
 
 
 
+
+
+
+
+
+
+
+`ifndef SIM 
 HDMI hdmi_inst(
     .I_clk(I_clk),
     .I_rst(I_rst),
@@ -48,6 +58,7 @@ HDMI hdmi_inst(
     .O_tmds_data_p(O_tmds_data_p),
     .O_tmds_data_n(O_tmds_data_n)
 );
+`endif
 
 reg cs;
 wire miso;
@@ -136,15 +147,20 @@ wire finish_calc_crc____for_consumer_spi_mods;
 
 
 
-reg n_reset_cpu;
+reg n_reset_cpu=1'b0;
 reg [3:0] count_for_reset=4'h0;
 always @(posedge clk) begin
-    if(count_for_reset==4'ha) begin
-        n_reset_cpu<=1'b1;
+    if(lock_pll) begin
+        if(count_for_reset==4'ha) begin
+            n_reset_cpu<=1'b1;
+        end
+        else begin
+            n_reset_cpu<=1'b0;
+            count_for_reset<=count_for_reset+4'h1;
+        end
     end
     else begin
         n_reset_cpu<=1'b0;
-        count_for_reset<=count_for_reset+4'h1;
     end
 end
 
@@ -203,8 +219,8 @@ assign wre_mapper =
     wre_main_memory___rv32im_cpu_inst;
 
 
-Gowin_SP_SRAM_MAIN_MEMORY main_memory (
-    .dout(dout_main_memory), 
+MAIN_MEMORY main_memory_inst (
+    .dout_wire(dout_main_memory), 
     .clk(clk), 
     .oce(1'b1),
     .ce(1'b1),
@@ -213,7 +229,7 @@ Gowin_SP_SRAM_MAIN_MEMORY main_memory (
     .ad(addr_main_memory[11:0]),
     .din(din_main_memory)
 );
-
+wire [31:0] pc;
 mapper mapper_ins(
     .clk(clk),
     .addr_main_memory(addr_main_memory),
@@ -236,14 +252,23 @@ mapper mapper_ins(
     .dout_control_cpu_memory(dout_control_cpu_memory),
     .wre_control_cpu_memory(wre_control_cpu_memory)
 );
+
+
 rv32im_cpu rv32im_cpu_inst(
     .clk(clk),
-    .reset(reset_cpu),
-    .mem_addr(addr_main_memory___rv32im_cpu_inst),
-    .mem_wdata(din_main_memory___rv32im_cpu_inst),
-    .mem_rdata(dout_mapper),
-    .mem_we(wre_main_memory___rv32im_cpu_inst),
+    .reset(reset_cpu|(~lock_pll)),
+    .mem_addr___external(addr_main_memory___rv32im_cpu_inst),
+    .mem_wdata___external(din_main_memory___rv32im_cpu_inst),
+    .mem_rdata___external(dout_mapper),
+    .mem_we___external(wre_main_memory___rv32im_cpu_inst),
     .enable(1'b1)
+`ifdef use_clock_of_144mhz_to_get_log_from_proc
+    ,
+    .clk_to_get_signals(clk_to_get_signals),
+    .mem_rdata_with_sinals(mem_rdata_with_sinals),
+    .mem_with_sinals_addr(mem_with_sinals_addr)
+`endif
+
 );
 
 control_leds control_leds_ins(
@@ -251,8 +276,8 @@ control_leds control_leds_ins(
     .addr_led_memory(addr_led_memory),
     .din_led_memory(din_led_memory),
     .dout_led_memory(dout_led_memory),
-    .wre_led_memory(wre_led_memory)
-//    .leds(led)
+    .wre_led_memory(wre_led_memory),
+    .leds(led)
 );
 control_cpu control_cpu_ins(
     .clk(clk),
@@ -262,7 +287,7 @@ control_cpu control_cpu_ins(
     .dout_control_cpu_memory(dout_control_cpu_memory),
     .wre_control_cpu_memory(wre_control_cpu_memory),
     .reset_cpu(reset_cpu),
-    .leds(led)
+    .sel___main_memory(sel___main_memory)
 );
 /*
 shutdown_and_start_cpu shutdown_and_start_cpu_inst(
@@ -287,7 +312,7 @@ enable_or_pause_cpu enable_or_pause_cpu_inst(
 
 senddata senddata0 (
     .clk(clk),
-    .rst_n(awake_module[ID_MODULE____SEND_DATA]),
+    .rst_n(awake_module[ID_MODULE____SEND_DATA]&lock_pll),
     .data_line_from_read_fifo(mux__din__consumer_spi[ID_MODULE____SEND_DATA]),
     .rd_req_fifo(mux__rd_req__consumer_spi[ID_MODULE____SEND_DATA]),
     .rd_ready_fifo(mux__rd_ready__consumer_spi[ID_MODULE____SEND_DATA]),
@@ -317,7 +342,7 @@ senddata senddata0 (
 
 recvdata recvdata0 (
     .clk(clk),
-    .rst_n(awake_module[ID_MODULE____RECV_DATA]),
+    .rst_n(awake_module[ID_MODULE____RECV_DATA]&lock_pll),
     .data_line_from_read_fifo(mux__din__consumer_spi[ID_MODULE____RECV_DATA]),
     .rd_req_fifo(mux__rd_req__consumer_spi[ID_MODULE____RECV_DATA]),
     .rd_ready_fifo(mux__rd_ready__consumer_spi[ID_MODULE____RECV_DATA]),
@@ -351,7 +376,7 @@ recvdata recvdata0 (
 consumer_spi #(N_BITS_TO_ADDRESS_MODULES,N_MODULES) consumer_spi_0
 (
     .clk(clk),
-    .rst_n(~cs),
+    .rst_n((~cs)&lock_pll),
     .cs(cs),
     .data_line_from_read_fifo(mux__din__consumer_spi[ID_MODULE____SPI___CONSUMER_SPI]),
     .rd_req_fifo(mux__rd_req__consumer_spi[ID_MODULE____SPI___CONSUMER_SPI]),
@@ -380,7 +405,7 @@ consumer_spi #(N_BITS_TO_ADDRESS_MODULES,N_MODULES) consumer_spi_0
 
 spi_slave spi_slave_0(
     .clk(clk),
-    .rst_n(~cs),
+    .rst_n((~cs)&lock_pll),
     .sclk(sclk),
     .cs(cs),
     .mosi(mosi),
@@ -399,7 +424,7 @@ spi_slave spi_slave_0(
 
 crc32_fsm crc32__consumer_spi (
     .clk(clk),
-    .rst_n(~cs),
+    .rst_n((~cs)&lock_pll),
     .cs(cs),
     .start(start_crc32____for_consumer_spi_mods),
     .data_in(data_in_crc32____for_consumer_spi_mods),
@@ -414,7 +439,7 @@ crc32_fsm crc32__consumer_spi (
 
 fifo fifo_spi_slave_read__and__fifo_spi_consumer_write(
         .clk(clk),
-        .rst_n(~cs),
+        .rst_n((~cs)&lock_pll),
         .cs(cs),
         .wr_req(wr_req__consumer_spi),
         .rd_req(rd_req__spi_slave),
@@ -429,7 +454,7 @@ fifo fifo_spi_slave_read__and__fifo_spi_consumer_write(
 
 fifo fifo_spi_slave_write__and__fifo_spi_consumer_read(
         .clk(clk),
-        .rst_n(~cs),
+        .rst_n((~cs)&lock_pll),
         .cs(cs),
         .wr_req(wr_req__spi_slave),
         .rd_req(rd_req__consumer_spi),

@@ -115,6 +115,7 @@ always @(posedge clk) begin
         module_id_sel<=16'h00;
         awake_module<='0;
         sending_crc_resulted_from_module_op<=1'b0;
+        sel___main_memory<=4'b0000;
     end
     else begin
         cs_prev<=cs;

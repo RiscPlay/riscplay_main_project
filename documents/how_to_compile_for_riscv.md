@@ -1,61 +1,67 @@
 Files need to compile beyond  main.c:
-* linker.ld
+### linker.ld
 ```ld
 
 ENTRY(_start)
 
 MEMORY
 {
-  RAM (rwx) : ORIGIN = 0x80000000, LENGTH = 64K
+  RAM (rwx) : ORIGIN = 0x80000000, LENGTH = 16K
 }
 
 SECTIONS
 {
+  /* Código */
   .text : {
     *(.init)
     *(.text*)
   } > RAM
 
+  /* Constantes */
   .rodata : {
     *(.rodata*)
   } > RAM
 
+  /* Dados já inicializados (já estarão na RAM) */
   .data : {
+    . = ALIGN(4);
+    _sdata = .;
     *(.data*)
+    . = ALIGN(4);
+    _edata = .;
   } > RAM
 
+  /* Dados não inicializados */
   .bss : {
+    . = ALIGN(4);
+    _sbss = .;
     *(.bss*)
+    *(COMMON)
+    . = ALIGN(4);
+    _ebss = .;
   } > RAM
+
+  /* Topo da stack */
+  _stack_top = ORIGIN(RAM) + LENGTH(RAM);
 }
 ```
 
-* startup.S
+### startup.S
 ```bash
 .section .init
 .global _start
 
 _start:
 
-    # inicializa stack
+    /* inicializa stack */
     la sp, _stack_top
 
-    # copiar .data da ROM para RAM
-    la a0, _sidata
-    la a1, _sdata
-    la a2, _edata
+    /* opcional: zerar alguns registradores (debug mais previsível) */
+    li t0, 0
+    li t1, 0
+    li t2, 0
 
-copy_data:
-    bge a1, a2, clear_bss
-    lw t0, 0(a0)
-    sw t0, 0(a1)
-    addi a0, a0, 4
-    addi a1, a1, 4
-    j copy_data
-
-clear_bss:
-
-    # limpar .bss
+    /* limpar .bss */
     la a0, _sbss
     la a1, _ebss
 
@@ -67,14 +73,15 @@ clear_bss_loop:
 
 call_main:
 
-    # chamar main
+    /* chama main */
     call main
 
+/* se main retornar, trava */
 hang:
     j hang
 ```
 
-To compile:
+### To compile:
 ```bash
 riscv32-unknown-elf-gcc \
 -march=rv32im \
@@ -130,7 +137,7 @@ startup.S main.c \
 or
 
 ```bash
-riscv32-unknown-elf-gcc \
+riscv64-unknown-elf-gcc \
 -march=rv32i \
 -mabi=ilp32 \
 -O2 \
@@ -150,7 +157,7 @@ startup.S main.c \
 -o firmware.elf
 ```
 
-Transform elf in bin 
+### Transform elf in bin 
 
 ```bash
 riscv32-unknown-elf-objcopy -O binary firmware.elf firmware.bin
