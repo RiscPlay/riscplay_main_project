@@ -30,16 +30,17 @@ module top (
 
 `include "defines_to_use_clocks.vh"
 
-wire clk;
+wire clkout;
 wire lock_pll;
 wire clkoutp;
+wire clk;
 pll ppl_ins (
     .clkin(I_clk),
-    .clkout(clk),
+    .clkout(clkout),
     .lock(lock_pll),
     .clkoutp(clkoutp)
 );
-
+assign clk=clkout;
 
 
 
@@ -231,7 +232,6 @@ MAIN_MEMORY main_memory_inst (
 );
 wire [31:0] pc;
 mapper mapper_ins(
-    .clk(clk),
     .addr_main_memory(addr_main_memory),
     .din_main_memory(din_main_memory),
     .dout_main_memory(dout_main_memory),
@@ -262,13 +262,6 @@ rv32im_cpu rv32im_cpu_inst(
     .mem_rdata___external(dout_mapper),
     .mem_we___external(wre_main_memory___rv32im_cpu_inst),
     .enable(1'b1)
-`ifdef use_clock_of_144mhz_to_get_log_from_proc
-    ,
-    .clk_to_get_signals(clk_to_get_signals),
-    .mem_rdata_with_sinals(mem_rdata_with_sinals),
-    .mem_with_sinals_addr(mem_with_sinals_addr)
-`endif
-
 );
 
 control_leds control_leds_ins(

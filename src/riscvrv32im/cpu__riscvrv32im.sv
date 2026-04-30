@@ -58,6 +58,7 @@ module rv32im_cpu(
 
   (* ram_style = "distributed" *)
   reg [31:0] regfile [0:31];
+  integer i;
 
   (* keep = "true" *) reg [31:0] rs1_val;
   (* keep = "true" *) reg [31:0] rs2_val;
@@ -99,6 +100,20 @@ module rv32im_cpu(
   `ifdef SIM
   `include "riscvrv32im/alu_defines.vh"
   `endif
+
+  `ifdef SIM
+  reg print_rs1;
+  reg print_rs2;
+  reg print_rd;
+  integer fp_with_data;
+  `endif
+  `ifdef SIM
+  initial begin
+    fp_with_data = $fopen("out.txt", "w");
+    $fwrite(fp_with_data,"pc      ,rs1_val ,r1,rs2_val ,r2,rd_val  ,rd\n");
+  end
+  `endif
+
   always @(posedge clk) begin
     if(reset==1'b0) begin
         if(sync__state) begin
@@ -132,6 +147,9 @@ module rv32im_cpu(
       mem_we_half<=1'b0;
       mem_addr <= 32'h80000000;
       leds<=6'b111111;
+      for (i = 0; i < 32; i = i + 1) begin
+          regfile[i] <= 32'h0;
+      end
     end
 
     else if(enable) begin
@@ -146,28 +164,35 @@ module rv32im_cpu(
             mem_we_half<=0;
             alu_result<=32'h00000000;
             branch_taken<=1'b0;
-            if(sync__state & time_that_stage_hold>8'h07) begin
+            if(sync__state & time_that_stage_hold>8'h00) begin
               state <= DECODE;
               instr <= mem_rdata;
             end
+            `ifdef SIM
+            print_rs1<=1'b0;
+            print_rs2<=1'b0;
+            print_rd<=1'b0;
+            `endif
         end
         DECODE: begin
           rs1_val <= regfile[rs1];
           rs2_val <= regfile[rs2];
           rd <= instr[11:7];
           write_in_register<=1'b0;
-          if(sync__state & time_that_stage_hold>8'h05) begin
             state <= EXECUTE;
-          end
+          
         end
 
         EXECUTE: begin
           case(opcode)
             7'b0000011: begin
               mem_addr <= rs1_val + imm_i;
-              if(sync__state & time_that_stage_hold>8'h08 & (~memory_control___busy)) begin
+              if(sync__state & time_that_stage_hold>8'h00 ) begin
                 state    <= MEMORY;
               end
+              `ifdef SIM
+              print_rs1<=1'b1;
+              `endif
             end
             7'b0100011: begin
               `ifndef SIM
@@ -176,9 +201,14 @@ module rv32im_cpu(
               `ifdef SIM
               `include "riscvrv32im/store.vh"
               `endif
-              if(sync__state & time_that_stage_hold>8'h08 & (~memory_control___busy)) begin
+              if(sync__state & time_that_stage_hold>8'h00 & (~memory_control___busy)) begin
                 state<= MEMORY;
               end
+              `ifdef SIM
+              print_rs1<=1'b1;
+              print_rs2<=1'b1;
+              print_rd<=1'b0;
+              `endif
 
             end
             7'b0010011: begin
@@ -190,6 +220,10 @@ module rv32im_cpu(
               `endif
               state <= WRITEBACK;
               write_in_register<=1'b1;
+              `ifdef SIM
+              print_rs1<=1'b1;
+              print_rd<=1'b1;
+              `endif
 
             end
             7'b0110011: begin
@@ -201,6 +235,11 @@ module rv32im_cpu(
               `endif
               state <= WRITEBACK;
               write_in_register<=1'b1;
+              `ifdef SIM
+              print_rs1<=1'b1;
+              print_rs2<=1'b1;
+              print_rd<=1'b1;
+              `endif
             end
             7'b1100011: begin
               `ifndef SIM
@@ -209,31 +248,45 @@ module rv32im_cpu(
               `ifdef SIM
               `include "riscvrv32im/branch.vh"
               `endif
-
               state <= WRITEBACK;
+              `ifdef SIM
+              print_rs1<=1'b1;
+              print_rs2<=1'b1;
+              `endif
             end
             7'b1100111: begin //JALR
               if(funct3==3'b000) begin
                 alu_result<= pc+32'h00000004;
                 write_in_register<=1'b1;
                 state <= WRITEBACK;
+                `ifdef SIM
+                print_rd<=1'b1;
+                `endif
               end
             end
             7'b1101111: begin // JAL
               alu_result <= pc+32'h00000004;
               write_in_register<=1'b1;
               state <= WRITEBACK;
+              `ifdef SIM
+              print_rd<=1'b1;
+              `endif
             end
             7'b0110111: begin //LUI
               alu_result <= imm_u;
               write_in_register<=1'b1;
               state <= WRITEBACK;
-
+              `ifdef SIM
+              print_rd<=1'b1;
+              `endif
             end
             7'b0010111: begin //AUIPC
               alu_result <= pc + imm_u;
               write_in_register<=1'b1;
               state <= WRITEBACK;
+              `ifdef SIM
+              print_rd<=1'b1;
+              `endif
             end
             7'b0001111: begin // FENCE
               state <= WRITEBACK;
@@ -255,17 +308,18 @@ module rv32im_cpu(
               `ifdef SIM
               `include "riscvrv32im/load.vh"
               `endif 
+              `ifdef SIM
+              print_rd<=1'b1;
+              `endif
               write_in_register<=1'b1;
             end
           endcase
-          if(sync__state & time_that_stage_hold>8'h01 ) begin
+          
               mem_we<=1'b0;
               mem_we_byte<=1'b0;
               mem_we_half<=1'b0;
-          end
-          if(sync__state & time_that_stage_hold>8'h08 & (~memory_control___busy)) begin
+         
               state <= WRITEBACK;
-          end
         end
 
         WRITEBACK: begin
@@ -290,7 +344,20 @@ module rv32im_cpu(
             end
             default: pc <= pc + 32'h00000004;
           endcase
+
           state <= FETCH;
+          `ifdef SIM
+          $fwrite(fp_with_data,"%08h,",pc);
+          if(print_rs1) $fwrite(fp_with_data,"%08h,%02d,",rs1_val,rs1);
+          else $fwrite(fp_with_data,"None    ,No,");
+          if(print_rs2) $fwrite(fp_with_data,"%08h,%02d,",rs2_val,rs2);
+          else $fwrite(fp_with_data,"None    ,No,");
+          
+          if(print_rd && rd!=0) $fwrite(fp_with_data,"%08h,%02d",alu_result,rd);
+          else if(print_rd) $fwrite(fp_with_data,"00000000,%02d",rd);
+          else $fwrite(fp_with_data,"None    ,No");
+          $fwrite(fp_with_data,"\n");
+          `endif
 
         end
 

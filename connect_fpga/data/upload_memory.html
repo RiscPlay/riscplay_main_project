@@ -1,0 +1,36 @@
+<div class="row py-2">
+    <div class="col">
+        <h3>Upload Main Memory</h3>
+    </div>
+    <div class="row align-items-center py-1">
+
+        <div class="col">
+            <div class="docs-card docs-card-alt card ">
+                <div class="card-body p-2">
+                    <div class=" text-center p-20 py-sm-4"
+                        style="border: 2px dashed var(--border-color); cursor: pointer;"
+                        onclick="document.getElementById('fileInput').click()">
+                        <p class="text-muted" x-text="file_name_sel"></p>
+                        <h5 class="card-title">Click here to select file to upload</h5>
+
+                        <input id="fileInput" type="file" hidden @change="loadfile($event)">
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col">
+            <button @click="sendFile()" class="btn btn-secondary py-3 py-sm-4 px-3 px-sm-4"">Upload</button>
+        </div>
+    </div>
+
+    <template x-if="error">
+        <div class="row py-1">
+            <div class="col">
+                <div class="alert alert-danger" role="alert">
+                    <h5 class="alert-heading">Danger</h5>
+                    Upload error inside.
+                </div>
+            </div>
+        </div>
+    </template>
+</div>

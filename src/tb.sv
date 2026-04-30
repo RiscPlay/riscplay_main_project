@@ -25,7 +25,7 @@ module tb;
         rst = 1;
 
         // inicializa memória com valores hexadecimais
-        for (i = 0; i < 204800; i = i + 1) begin
+        for (i = 0; i < 22744; i = i + 1) begin
             #20;
         end
 

@@ -1,0 +1,46 @@
+  <div class="row">
+    <div class="col">
+      <h3>View memory</h3>
+    </div>
+  </div>
+  <div class="row">
+    <div class="col-4">
+      <div class="input-group mb-3">
+        <span class="input-group-text" id="add-on-1">Addr n hex</span>
+        <input type="text" x-model="addr_of_the_memory_to_watch" class="form-control" placeholder="80000000"
+          aria-label="Username" aria-describedby="add-on-1"
+          oninput="this.value = this.value.toUpperCase().replace(/[^0-9A-F]/g, ''); if (this.value.length > 8) { this.value = this.value.slice(0, 8);} if (this.value && parseInt(this.value, 16) > 0xFFFFFFFF) { this.value = 'FFFFFFFF'; }">
+      </div>
+    </div>
+    <div class="col-4">
+      <div class="input-group mb-3">
+        <span class="input-group-text" id="add-on-1">Amount</span>
+        <input type="number" x-model="amount_to_read" min="1" step="1" max="64" class="form-control" placeholder="100"
+          aria-label="Username" aria-describedby="add-on-1"
+          oninput=" this.value = this.value.replace(/[^0-9]/g, ''); if (this.value > 64) this.value = 256;">
+      </div>
+    </div>
+    <div class="col-2">
+      <button @click="recvData()" class="btn btn-secondary">get</button>
+    </div>
+  </div>
+  <div class="row">
+    <div class="col">
+      <div class="docs-card docs-card-alt card  p-20">
+        <div class="card-body p-2" style="overflow-x: auto;">
+          <table class="table table-striped-columns" style="font-family: monospace;">
+            <tbody>
+              <template x-for="(row,i) in memory_view.mem" :key="i">
+                <tr>
+                  <!-- <th scope="row" x-text="i"></th> -->
+                  <template x-for="(cell,j) in memory_view.mem[i]" :key="j">
+                    <td x-text="cell"></td>
+                  </template>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>

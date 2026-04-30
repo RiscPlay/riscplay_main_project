@@ -36,12 +36,11 @@ void create_server()
 {
   // Configurar rotas
   server.on("/", HTTP_GET, handleRoot);
-  server.on("/alpinejs.js", HTTP_GET, handleAlpinejs);
-
   server.on("/send_data", HTTP_POST, handleSendData);
   server.on("/stop_processor", HTTP_GET, handleStopProcessor);
   server.on("/enable_processor", HTTP_GET, handleEnableProcessor);
   server.on("/recv_data", HTTP_GET, handleRecvData);
+  server.serveStatic("/", SPIFFS, "/");
 
   server.onNotFound(handleNotFound);
 

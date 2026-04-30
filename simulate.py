@@ -36,7 +36,6 @@ def main():
 
    
     print(" ".join(cmd))
-
     subprocess.run(cmd)
     subprocess.run(["vvp","sim.out"])
     os.chdir(original_dir)

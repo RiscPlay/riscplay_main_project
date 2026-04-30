@@ -2,8 +2,8 @@
 .globl _start
 
 _start:
-
-    li t0, 0x8000300
+    lui   t0, 0x80000
+    addi  t0, t0, 0x300
 
     li t1, 111
     sw t1, 0(t0)

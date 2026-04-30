@@ -9,6 +9,7 @@
         <File path="src/control_cpu/control_cpu_clock.sv" type="file.verilog" enable="1"/>
         <File path="src/control_cpu/shutdown_and_start_cpu.sv" type="file.verilog" enable="1"/>
         <File path="src/control_leds/control_leds.v" type="file.verilog" enable="1"/>
+        <File path="src/pll.v" type="file.verilog" enable="1"/>
         <File path="src/dvi_tx/dvi_tx.v" type="file.verilog" enable="1"/>
         <File path="src/gowin_rpll/TMDS_rPLL.v" type="file.verilog" enable="1"/>
         <File path="src/gowin_rpll/gowin_rpll___clkout_162mhz___clkoutd_5mhz.v" type="file.verilog" enable="1"/>

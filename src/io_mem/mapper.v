@@ -1,64 +1,65 @@
 module mapper(
-    input   wire            clk,
-    output  reg     [11:0]  addr_main_memory,
-    output  reg     [31:0]  din_main_memory,
-    input   wire    [31:0]  dout_main_memory,
-    output  reg             wre_main_memory,
+    input  wire [11:0] addr_main_memory_in,
+    output wire [11:0] addr_main_memory,
+    output wire [31:0] din_main_memory,
+    input  wire [31:0] dout_main_memory,
+    output wire        wre_main_memory,
 
-    output  reg     [5:0]   addr_led_memory,
-    output  reg     [31:0]  din_led_memory,
-    input   wire    [31:0]  dout_led_memory,
-    output  reg             wre_led_memory,
+    output wire [5:0]  addr_led_memory,
+    output wire [31:0] din_led_memory,
+    input  wire [31:0] dout_led_memory,
+    output wire        wre_led_memory,
 
+    output wire [5:0]  addr_control_cpu_memory,
+    output wire [31:0] din_control_cpu_memory,
+    input  wire [31:0] dout_control_cpu_memory,
+    output wire        wre_control_cpu_memory,
 
-    output  reg     [5:0]   addr_control_cpu_memory,
-    output  reg     [31:0]  din_control_cpu_memory,
-    input   wire    [31:0]  dout_control_cpu_memory,
-    output  reg             wre_control_cpu_memory,
-    
+    input  wire [31:0] addr_mapper,
+    input  wire [31:0] din_mapper,
+    output wire [31:0] dout_mapper,
+    input  wire        wre_mapper,
 
-    input   wire    [31:0]  addr_mapper,
-    input   wire    [31:0]  din_mapper,
-    output  reg     [31:0]  dout_mapper,
-    input   wire            wre_mapper,
-    
-    
-    
-    output  reg    [5:0]   leds,
-    input   wire   [31:0]  pc
+    output wire [5:0]  leds,
+    input  wire [31:0] pc
 );
-reg start=1'b0;
-always @(posedge clk) begin
-    if(addr_mapper[29]==1'b1) begin
-        addr_main_memory <=addr_mapper[11:0];
-        dout_mapper<=dout_main_memory;
-        din_main_memory<=din_mapper;
-        wre_main_memory<=wre_mapper;
-        wre_control_cpu_memory<=1'b0;
-        wre_led_memory<=1'b0;
-    end
-    else if(addr_mapper[8]==1'b1) begin
-        addr_control_cpu_memory <=addr_mapper[5:0];
-        dout_mapper<=dout_control_cpu_memory;
-        din_control_cpu_memory<=din_mapper;
-        wre_control_cpu_memory<=wre_mapper;
-        wre_main_memory<=1'b0;
-        wre_led_memory<=1'b0;
-    end
-    else if(addr_mapper[6]==1'b1) begin
-        addr_led_memory <=addr_mapper[5:0];
-        dout_mapper<=dout_led_memory;
-        din_led_memory<=din_mapper;
-        wre_led_memory<=wre_mapper;
-        wre_main_memory<=1'b0;
-        wre_control_cpu_memory<=1'b0;
-    end
-    else begin
-        wre_main_memory<=1'b0;
-        wre_control_cpu_memory<=1'b0;
-        wre_led_memory<=1'b0;
-    end
-    
-end
+
+//
+// Decodificação de regiões
+//
+wire sel_main    = addr_mapper[29];
+wire sel_control = ~sel_main && addr_mapper[8];
+wire sel_led     = ~sel_main && ~sel_control && addr_mapper[6];
+
+//
+// MAIN MEMORY
+//
+assign addr_main_memory = addr_mapper[11:0];
+assign din_main_memory  = din_mapper;
+assign wre_main_memory  = sel_main ? wre_mapper : 1'b0;
+
+//
+// CONTROL CPU MEMORY
+//
+assign addr_control_cpu_memory = addr_mapper[5:0];
+assign din_control_cpu_memory  = din_mapper;
+assign wre_control_cpu_memory  = sel_control ? wre_mapper : 1'b0;
+
+//
+// LED MEMORY
+//
+assign addr_led_memory = addr_mapper[5:0];
+assign din_led_memory  = din_mapper;
+assign wre_led_memory  = sel_led ? wre_mapper : 1'b0;
+
+//
+// MUX de leitura
+//
+assign dout_mapper =
+    sel_main    ? dout_main_memory :
+    sel_control ? dout_control_cpu_memory :
+    sel_led     ? dout_led_memory :
+    32'h00000000;
+
 
 endmodule

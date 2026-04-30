@@ -14,16 +14,17 @@ module MAIN_MEMORY (
 
     reg [11:0] addr_reg;
 
-    `ifdef SIM  // só em simulação (ex: iverilog -DSIM)
+     // só em simulação (ex: iverilog -DSIM)
     reg [31:0] dout;
     assign dout_wire=dout;
+    `ifdef SIM  
     initial begin
         $display("Loading memory from mem.hex...");
-        $readmemh("../tests/test_assembly/test_load_hw_sw.hex", mem);
+        $readmemh("../tests/test_c/bubble_sort.hex", mem);
     end
+    `endif
 
-
-    
+    `ifdef SIM 
     always @(posedge clk) begin
         if (reset) begin
             dout <= 32'b0;

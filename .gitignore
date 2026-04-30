@@ -1,5 +1,5 @@
 *.log
-*.bin
+impl/*.bin
 *.binx
 *.db
 *.rpt.txt
@@ -7,3 +7,9 @@ rtl_parser_arg.json
 *.result
 sdram_control
 impl/*
+*.elf
+connect_fpga/.pio
+*.out
+*.vcd
+*.view.json
+*.mi

@@ -6,14 +6,17 @@ module pll (
     output wire  lock,
     output wire  clkoutp
 );
+
 `ifndef SIM 
+`include "defines_to_use_clocks.vh"
+
 wire clk_from_pll;
 wire clk_from_pll_90d;
 wire lock;
 wire clk;
 `ifdef use_clock_of_72mhz
 Gowin_rPLL__72mhz main_clock_used(
-     .clkout(clkout), //output clkout
+     .clkout(clk), //output clkout
      .clkoutp(clkoutp),
      .clkin(clkin) //input clkin
 );
@@ -23,7 +26,7 @@ assign lock=1'b1;
 
 `ifdef use_clock_of_90mhz
 Gowin_rPLL___90mhz main_clock_used(
-     .clkout(clkout), //output clkout
+     .clkout(clk), //output clkout
      .clkoutp(clkoutp),
      .lock(lock),
      .clkin(clkin) //input clkin
@@ -33,13 +36,14 @@ Gowin_rPLL___90mhz main_clock_used(
 `ifdef use_clock_of_144mhz_to_get_log_from_proc
 wire clock_debug_to_use_in_devices_low_speed; 
 gowin_rpll___clkout_162mhz___clkoutd_5mhz gowin_rpll___clkout_162mhz___clkoutd_5mhz_inst(
-    .clkout(clkout),
+    .clkout(clk),
     .lock(lock), 
     .clkoutp(clkoutp), 
     .clkoutd(clock_debug_to_use_in_devices_low_speed), 
     .clkin(clkin)
 );
 `endif
+assign clkout=clk;
 `endif
 `ifdef SIM 
 

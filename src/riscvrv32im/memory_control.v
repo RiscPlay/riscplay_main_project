@@ -7,13 +7,13 @@ module memory_control(
     
     input   wire  [31:0]  mem_addr,
     input   wire  [31:0]  mem_wdata,
-    output  reg   [31:0]  mem_rdata,
+    output  wire  [31:0]  mem_rdata,
     input   wire          mem_we,
     input   wire          mem_we_byte,
     input   wire          mem_we_half,
 
-    output  reg   [7:0]   mem_rdata_byte,
-    output  reg   [15:0]  mem_rdata_half,
+    output  wire   [7:0]   mem_rdata_byte,
+    output  wire   [15:0]  mem_rdata_half,
 
     input   wire   [7:0]   mem_wdata_byte,
     input   wire   [15:0]  mem_wdata_half,
@@ -21,7 +21,6 @@ module memory_control(
 
     output reg            busy
 );
-
 localparam
     STATE_P0    = 4'h0,
     STATE_P1    = 4'h1,
@@ -152,12 +151,12 @@ always @(posedge clk) begin
                 mem_we___from_cpu<=1'b1;
             end
             STATE_P3: begin
-                if(sync__state & time_that_stage_hold>4'h2) begin
+                if(sync__state & time_that_stage_hold>4'h0) begin
                    mem_we_copy<=1'b0;
                    mem_we_byte_copy<=1'b0;
                    mem_we_half_copy<=1'b0;
                 end
-                if(sync__state & time_that_stage_hold>4'hd) begin
+                if(sync__state & time_that_stage_hold>4'h0) begin
                     mem_we___from_cpu<=1'b0;
                     state<=STATE_P0;
                     busy<=1'b0;     
@@ -166,33 +165,25 @@ always @(posedge clk) begin
         endcase
     end
 end
+
 assign  mem_addr___from_cpu={2'b00,mem_addr[31:2]};
-always @(posedge clk) begin
-    case(byte_sel) 
-        2'b00: mem_rdata_byte<=mem_rdata___from_cpu[31:24];
-        2'b01: mem_rdata_byte<=mem_rdata___from_cpu[23:16];
-        2'b10: mem_rdata_byte<=mem_rdata___from_cpu[15:8];
-        2'b11: mem_rdata_byte<=mem_rdata___from_cpu[7:0];
-    endcase
-    case(byte_sel[1]) 
-        1'b0: mem_rdata_half<= {mem_rdata___from_cpu[23:16], mem_rdata___from_cpu[31:24]};
-        1'b1: mem_rdata_half<= {mem_rdata___from_cpu[7:0],  mem_rdata___from_cpu[15:8]};
-    endcase
-    mem_rdata<={mem_rdata___from_cpu[7:0],mem_rdata___from_cpu[15:8],mem_rdata___from_cpu[23:16],mem_rdata___from_cpu[31:24]};
-end
-/*
-assign mem_rdata_byte =
-    (byte_sel == 2'b00) ? mem_rdata___from_cpu[7:0]   :
-    (byte_sel == 2'b01) ? mem_rdata___from_cpu[15:8]  :
-    (byte_sel == 2'b10) ? mem_rdata___from_cpu[23:16] :
-                          mem_rdata___from_cpu[31:24];
 
-                          
-assign mem_rdata_half =
-    (byte_sel[1] == 1'b0) ?
-        {mem_rdata___from_cpu[7:0],  mem_rdata___from_cpu[15:8]} :
-        {mem_rdata___from_cpu[23:16], mem_rdata___from_cpu[31:24]};
 
-assign mem_rdata = mem_rdata___from_cpu;//{mem_rdata___from_cpu[7:0],mem_rdata___from_cpu[15:8],mem_rdata___from_cpu[23:16],mem_rdata___from_cpu[31:24]};
-*/
+    assign mem_rdata_byte =
+        (byte_sel==2'b00)? mem_rdata___from_cpu[31:24] :
+        (byte_sel==2'b01)? mem_rdata___from_cpu[23:16] :
+        (byte_sel==2'b10)? mem_rdata___from_cpu[15:8]  :
+                        mem_rdata___from_cpu[7:0];
+
+    assign mem_rdata_half =
+        byte_sel[1] ?
+        {mem_rdata___from_cpu[7:0],mem_rdata___from_cpu[15:8]} :
+        {mem_rdata___from_cpu[23:16],mem_rdata___from_cpu[31:24]};
+
+    assign mem_rdata = {
+        mem_rdata___from_cpu[7:0],
+        mem_rdata___from_cpu[15:8],
+        mem_rdata___from_cpu[23:16],
+        mem_rdata___from_cpu[31:24]
+    };
 endmodule

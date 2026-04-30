@@ -1,3 +1,180 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:f7bd111c71ff1439c5480952a70f5b4e54df7f24665de04c528da1415c433745
-size 9594
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" data-bs-core="modern" data-bs-theme="dark">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ESP32 HEX API</title>
+
+  <script src="alpinejs.js" defer></script>
+
+  <!-- Halfmoon CSS -->
+  <link href="halfmoon.min.css" rel="stylesheet">
+
+  <!-- Halfmoon modern core theme -->
+  <link href="halfmoon.modern.css" rel="stylesheet">
+  <script src="halfmoon.min.js"></script>
+
+  <script src="htmx.min.js" defer></script>
+
+</head>
+
+<body x-data="App()">
+
+  <div class="page-wrapper">
+    <div class="container px-3 px-sm-4 px-xl-5">
+      <div class="row">
+        <div class="col py-3 py-sm-4">
+          <h1>Control PlayRisc Processor</h1>
+        </div>
+      </div>
+      <div class="row">
+        <div class="col"  hx-get="upload_memory.html" hx-trigger="load">
+        </div>
+      </div>
+      <div class="row py-5">
+        <div class="col"  hx-get="view_memory.html" hx-trigger="load">
+        </div>
+      </div>
+      <div class="row py-5">
+        <div class="col"  hx-get="view_registers.html" hx-trigger="load">
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    function toHex32(value) {
+      return (value >>> 0).toString(16).padStart(8, "0");
+    }
+    function split512(str) {
+      let chunks = [];
+
+      for (let i = 0; i < str.length; i += 512) {
+        chunks.push(str.slice(i, i + 512));
+      }
+
+      return chunks;
+    }
+    function App() {
+      return {
+        hex: "",
+        file_name_sel: "",
+        addr_of_the_memory_to_watch:"",
+        amount_to_read:"",
+        error: false,
+        memory:[],
+        memory_view:{"mem":[]},
+
+        format_memory(){
+          const n_cols=6;
+          var cells=[];
+          var rows=[];
+          var word=""
+          for(let i=0;i<this.memory.length;i++){
+            word=word+this.memory[i];
+            if(word.length==4)
+              word=word+"_";
+            if(word.length==9){
+              cells.push(word);
+              word="";
+            }
+            if(cells.length==n_cols){
+              rows.push(cells);
+              cells=[];
+            }
+          }
+          this.memory_view.mem=rows
+        },
+
+        async loadfile(event) {
+          const file = event.target.files[0];
+          this.file_name_sel = file ? file.name : "File don't selected";
+          const buffer = await file.arrayBuffer();
+          const bytes = new Uint8Array(buffer);
+
+          let hex = "";
+          for (let b of bytes) {
+            hex += b.toString(16).padStart(2, "0");
+          }
+
+          this.hex = hex;
+        },
+        async sendFile() {
+
+
+          this.error = false;
+          try {
+            var response = await fetch("/stop_processor", {
+              method: "GET",
+            });
+          }
+          catch {
+            this.error = true;
+            return;
+          }
+          var code = response.status;
+          if (code != 200) {
+            this.error = true;
+            return;
+          }
+
+          var addr = 0x20000000;
+          var chuncks = split512(this.hex);
+
+          for (let i = 0; i < chuncks.length; i++) {
+            var addr_hex = toHex32(addr + (i*64));
+            try {
+              var response = await fetch("/send_data", {
+                method: "POST",
+                body: addr_hex + chuncks[i]
+              });
+            }
+            catch {
+              this.error = true;
+              return;
+            }
+            var code = response.status;
+            if (code != 200) {
+              this.error = true;
+              return;
+            }
+
+            try {
+              var response = await fetch("/enable_processor", {
+                method: "GET",
+              });
+            }
+            catch {
+              this.error = true;
+              return;
+            }
+            var code = response.status;
+            if (code != 200) {
+              this.error = true;
+              return;
+            }
+          }
+        },
+        async recvData(){
+          const res = await fetch("recv_data?n="+(this.amount_to_read*4)+"&addr="+this.addr_of_the_memory_to_watch);
+          const buffer = await res.arrayBuffer();
+
+          const bytes = new Uint8Array(buffer);
+
+          const hex = Array.from(bytes).map(b =>
+            b.toString(16).padStart(2, '0').toUpperCase()
+          );
+          this.memory=hex;
+
+          var temp=hex;
+          this.format_memory();
+        }
+      }
+    }
+
+
+  </script>
+  <script src="bootstrap.bundle.min.js"></script>
+</body>
+
+</html>
