@@ -1,4 +1,3 @@
-
 #include <stdint.h>
 #ifdef __linux__
 #include <stdio.h>
@@ -97,7 +96,7 @@ void xtea_encrypt(uint32_t *v0, uint32_t *v1, uint32_t key[4]) {
     uint32_t sum = 0;
     uint32_t delta = 0x9E3779B9;
 
-    for (int i = 0; i < 32; i++) {
+    for (int i = 0; i < 128; i++) {
         *v0 += (((*v1 << 4) ^ (*v1 >> 5)) + *v1) ^ (sum + key[sum & 3]);
         sum += delta;
         *v1 += (((*v0 << 4) ^ (*v0 >> 5)) + *v0) ^ (sum + key[(sum >> 11) & 3]);
@@ -115,7 +114,8 @@ uint32_t xtea_rand_range(XTEA_PRNG *rng, uint32_t min, uint32_t max) {
     return min + (xtea_rand(rng) % (max - min + 1));
 }
 
-#define N_ARR 128
+
+#define N_ARR 130
 
 
 int main() {
@@ -123,11 +123,17 @@ int main() {
     int n = N_ARR;
     XTEA_PRNG rng;
 
-    xtea_init(&rng, 123456789);
+    xtea_init(&rng, 12789);
     for (int i = 0; i < N_ARR; i++) {
         arr[i]=xtea_rand(&rng);
     }
 
+    #ifdef __riscv
+    for(int i=0;i<N_ARR;i++){
+        volatile uint32_t *p0 = (volatile uint32_t*)(0x80002000+(i*4));
+        *p0=arr[i];
+    }
+    #endif
     heapSort(arr, n);
     uint32_t crc = crc32((uint8_t *)arr, n*4);
     //uint32_t crc=UINT32_C(0xfafb);
@@ -137,14 +143,19 @@ int main() {
     }
     printf("CRC32: 0x%08X\n", crc);
     #endif
-
-    
+    #ifdef __riscv
+    for(int i=0;i<N_ARR;i++){
+        volatile uint32_t *p1 = (volatile uint32_t*)(0x80002400+(i*4));
+        *p1=arr[i];
+    }
+    #endif
 
     #ifdef __riscv
     volatile uint32_t *p2 = (volatile uint32_t*)0x00000104;
     *p2=crc;
     #endif
 
+    
     if(crc!=UINT32_C(0x1999FBD4)){
         #ifdef __riscv
         volatile uint32_t *p3 = (volatile uint32_t*)0x00000100;//to read use uint32_t value = *(volatile uint32_t*)0x00000110;

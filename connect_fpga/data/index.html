@@ -29,23 +29,22 @@
         </div>
       </div>
       <div class="row">
-        <div class="col"  hx-get="upload_memory.html" hx-trigger="load">
+        <div class="col" hx-get="upload_memory.html" hx-trigger="load">
         </div>
       </div>
       <div class="row py-5">
-        <div class="col"  hx-get="view_memory.html" hx-trigger="load">
-        </div>
-      </div>
-      <div class="row py-5">
-        <div class="col"  hx-get="view_registers.html" hx-trigger="load">
+        <div class="col" hx-get="view_memory_v2.html" hx-trigger="load">
         </div>
       </div>
     </div>
   </div>
   <script>
+    var addr_serv = ""
+
     function toHex32(value) {
       return (value >>> 0).toString(16).padStart(8, "0");
     }
+
     function split512(str) {
       let chunks = [];
 
@@ -55,37 +54,128 @@
 
       return chunks;
     }
+
+    function formatSignedFixed16bits(num) {
+      const sign = num >= 0 ? '+' : '-';
+      const abs = Math.abs(Math.trunc(num));
+
+      return sign + String(abs).padStart(5, '0');;
+    }
+
+    function formatSignedFixed8bits(num) {
+      const sign = num >= 0 ? '+' : '-';
+      const abs = Math.abs(Math.trunc(num));
+
+      return sign + String(abs).padStart(3, '0');
+    }
+
+    function hexToSigned16Pair(hexStr) {
+      var hexStr2 = hexStr[7] + hexStr[8] + hexStr[5] + hexStr[6] + "_" + hexStr[2] + hexStr[3] + hexStr[0] + hexStr[1];
+      // Remove underscore if present
+      hexStr2 = hexStr2.replace(/_/g, '');
+
+      // Parse as 32-bit unsigned number
+      const value = parseInt(hexStr2, 16) >>> 0;
+
+      // Extract high and low 16 bits
+      let high = (value >>> 16) & 0xFFFF;
+      let low = value & 0xFFFF;
+
+      // Convert to signed 16-bit
+      if (high & 0x8000) high -= 0x10000;
+      if (low & 0x8000) low -= 0x10000;
+
+      return {
+        high: formatSignedFixed16bits(high),
+        low: formatSignedFixed16bits(low)
+      };
+    }
+
+    function hexToSigned8Array(hexStr) {
+      // Remove underscores
+      var hexStr2 = hexStr[7] + hexStr[8] + hexStr[5] + hexStr[6] + "_" + hexStr[2] + hexStr[3] + hexStr[0] + hexStr[1];
+
+      hexStr2 = hexStr2.replace(/_/g, '');
+
+      // Parse as 32-bit unsigned
+      const value = parseInt(hexStr2, 16) >>> 0;
+
+      // Extract 4 bytes (big-endian order)
+      let bytes = [
+        (value >>> 24) & 0xFF,
+        (value >>> 16) & 0xFF,
+        (value >>> 8) & 0xFF,
+        value & 0xFF
+      ];
+
+      // Convert each to signed 8-bit
+      return bytes.map(b => (b & 0x80) ? formatSignedFixed8bits(b - 0x100) : formatSignedFixed8bits(b));
+    }
+
     function App() {
       return {
         hex: "",
         file_name_sel: "",
-        addr_of_the_memory_to_watch:"",
-        amount_to_read:"",
+        addr_of_the_memory_to_watch: "",
+        amount_to_read: "",
         error: false,
-        memory:[],
-        memory_view:{"mem":[]},
+        memory: [],
+        display_format: "hexadecimal__format___little_endian",
+        highlight_addr:"",
+        last_memory_addr_that_user_sent_to_get_memory:0,
+        memory_view: {
+          "mem": []
+        },
+        highlight_pos: 0,
+        format_memory(highlight_pos) {
+          var cells = [];
+          var word_32bits_hexa = ""
+          var memory_address_of_the_word=this.last_memory_addr_that_user_sent_to_get_memory;
+          for (let i = 0; i < this.memory.length; i++) {
+            word_32bits_hexa = word_32bits_hexa + this.memory[i];
+            if (word_32bits_hexa.length == 4)
+              word_32bits_hexa = word_32bits_hexa + "_";
+            if (word_32bits_hexa.length == 9) {
+              var style = "cursor: pointer; white-space: nowrap;   display: inline-block;"
+              if (cells.length % 2 == 0)
+                var cell_class = "text-body";
+              else
+                var cell_class = "text-body-secondary";
+              if (cells.length == highlight_pos) {
+                cell_class = " text-black";
+                style = style + " background-color: var(--bs-lightgray-200); "
+              }
 
-        format_memory(){
-          const n_cols=6;
-          var cells=[];
-          var rows=[];
-          var word=""
-          for(let i=0;i<this.memory.length;i++){
-            word=word+this.memory[i];
-            if(word.length==4)
-              word=word+"_";
-            if(word.length==9){
-              cells.push(word);
-              word="";
-            }
-            if(cells.length==n_cols){
-              rows.push(cells);
-              cells=[];
+              style = style + " margin-right:2ch; margin-left:2ch;"
+              var sixteen_bits_signed = hexToSigned16Pair(word_32bits_hexa);
+              var eight_bits_signed = hexToSigned8Array(word_32bits_hexa);
+              var word_32bits_hexa___little_endian = word_32bits_hexa[7] + word_32bits_hexa[8] + word_32bits_hexa[5] +
+                word_32bits_hexa[6] + "_" + word_32bits_hexa[2] + word_32bits_hexa[3] + word_32bits_hexa[0] +
+                word_32bits_hexa[1];
+
+              cells.push({
+                "hexadecimal__format___little_endian": word_32bits_hexa___little_endian,
+                "hexadecimal__format___big_endian": word_32bits_hexa,
+                "sixteenbits_signed__format": sixteen_bits_signed.low  + "  " + sixteen_bits_signed.high ,
+                "eightbits_signed__format": eight_bits_signed[0] + "  " + eight_bits_signed[1] + "  " +
+                  eight_bits_signed[2] + "  " + eight_bits_signed[3],
+                "class": cell_class,
+                "style": style,
+                "memory_address_of_the_word":memory_address_of_the_word
+              });
+              memory_address_of_the_word=memory_address_of_the_word+1;
+              word_32bits_hexa = "";
             }
           }
-          this.memory_view.mem=rows
+          this.memory_view.mem = cells
+          this.highlight_pos = highlight_pos;
+          this.highlight_addr=cells[highlight_pos].memory_address_of_the_word.toString(16);;
         },
-
+        movehighlight(inc_highlight_pos) {
+          if ((this.highlight_pos + inc_highlight_pos) >= 0 && (this.highlight_pos + inc_highlight_pos) < this
+            .memory_view.mem.length)
+            this.format_memory(this.highlight_pos + inc_highlight_pos);
+        },
         async loadfile(event) {
           const file = event.target.files[0];
           this.file_name_sel = file ? file.name : "File don't selected";
@@ -104,11 +194,10 @@
 
           this.error = false;
           try {
-            var response = await fetch("/stop_processor", {
+            var response = await fetch(addr_serv + "/stop_processor", {
               method: "GET",
             });
-          }
-          catch {
+          } catch {
             this.error = true;
             return;
           }
@@ -122,14 +211,13 @@
           var chuncks = split512(this.hex);
 
           for (let i = 0; i < chuncks.length; i++) {
-            var addr_hex = toHex32(addr + (i*64));
+            var addr_hex = toHex32(addr + (i * 64));
             try {
-              var response = await fetch("/send_data", {
+              var response = await fetch(addr_serv + "/send_data", {
                 method: "POST",
                 body: addr_hex + chuncks[i]
               });
-            }
-            catch {
+            } catch {
               this.error = true;
               return;
             }
@@ -140,11 +228,10 @@
             }
 
             try {
-              var response = await fetch("/enable_processor", {
+              var response = await fetch(addr_serv + "/enable_processor", {
                 method: "GET",
               });
-            }
-            catch {
+            } catch {
               this.error = true;
               return;
             }
@@ -155,24 +242,33 @@
             }
           }
         },
-        async recvData(){
-          const res = await fetch("recv_data?n="+(this.amount_to_read*4)+"&addr="+this.addr_of_the_memory_to_watch);
-          const buffer = await res.arrayBuffer();
+        async recvData() {
+          var total_recv = 0;
+          this.memory = [];
+          var initial_addr = this.addr_of_the_memory_to_watch;
+          this.last_memory_addr_that_user_sent_to_get_memory=parseInt(this.addr_of_the_memory_to_watch,16);
+          while (true) {
+            var total_to_req = 0;
+            if ((this.amount_to_read - total_recv) > 64) total_to_req = 64;
+            else total_to_req = this.amount_to_read - total_recv;
+            const res = await fetch(addr_serv + "/recv_data?n=" + (total_to_req * 4) + "&addr=" + initial_addr);
+            total_recv = total_to_req + total_recv;
+            const buffer = await res.arrayBuffer();
 
-          const bytes = new Uint8Array(buffer);
+            const bytes = new Uint8Array(buffer);
 
-          const hex = Array.from(bytes).map(b =>
-            b.toString(16).padStart(2, '0').toUpperCase()
-          );
-          this.memory=hex;
-
-          var temp=hex;
-          this.format_memory();
+            const hex = Array.from(bytes).map(b =>
+              b.toString(16).padStart(2, '0').toUpperCase()
+            );
+            for (let i = 0; i < hex.length; i++)
+              this.memory.push(hex[i]);
+            initial_addr = (parseInt(initial_addr,16) + 64).toString(16).toUpperCase();
+            if (total_recv == this.amount_to_read) break;
+          }
+          this.format_memory(0);
         }
       }
     }
-
-
   </script>
   <script src="bootstrap.bundle.min.js"></script>
 </body>

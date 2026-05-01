@@ -131,7 +131,12 @@ int main() {
     for (int i = 0; i < N_ARR; i++) {
         arr[i]=(int16_t)xtea_rand(&rng);
     }
-    arr[0]=0;
+    #ifdef __riscv
+    for(int i=0;i<N_ARR;i++){
+        volatile int16_t *p0 = (volatile int16_t*)(0x80002000+(i*2));
+        *p0=arr[i];
+    }
+    #endif
     heapSort(arr, N_ARR);
     uint32_t crc = crc32((uint8_t *)arr, N_ARR*2);
     //uint32_t crc=UINT32_C(0xfafb);
@@ -141,7 +146,12 @@ int main() {
     }
     printf("CRC32: 0x%08X\n", crc);
     #endif
-
+    #ifdef __riscv
+    for(int i=0;i<N_ARR;i++){
+        volatile int16_t *p1 = (volatile int16_t*)(0x80002400+(i*2));
+        *p1=arr[i];
+    }
+    #endif
     
 
     #ifdef __riscv

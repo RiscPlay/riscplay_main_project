@@ -8,8 +8,8 @@
         {
             "name": "PlatformIO",
             "includePath": [
-                "C:/Users/kite/Documents/Arduino/connect_fpga/include",
-                "C:/Users/kite/Documents/Arduino/connect_fpga/src",
+                "C:/Users/kite/workspace/riscplay_main_project/connect_fpga/include",
+                "C:/Users/kite/workspace/riscplay_main_project/connect_fpga/src",
                 "C:/Users/kite/.platformio/packages/framework-arduinoespressif32/libraries/WebServer/src",
                 "C:/Users/kite/.platformio/packages/framework-arduinoespressif32/libraries/WiFi/src",
                 "C:/Users/kite/.platformio/packages/framework-arduinoespressif32/libraries/SPI/src",
@@ -244,8 +244,8 @@
             "browse": {
                 "limitSymbolsToIncludedHeaders": true,
                 "path": [
-                    "C:/Users/kite/Documents/Arduino/connect_fpga/include",
-                    "C:/Users/kite/Documents/Arduino/connect_fpga/src",
+                    "C:/Users/kite/workspace/riscplay_main_project/connect_fpga/include",
+                    "C:/Users/kite/workspace/riscplay_main_project/connect_fpga/src",
                     "C:/Users/kite/.platformio/packages/framework-arduinoespressif32/libraries/WebServer/src",
                     "C:/Users/kite/.platformio/packages/framework-arduinoespressif32/libraries/WiFi/src",
                     "C:/Users/kite/.platformio/packages/framework-arduinoespressif32/libraries/SPI/src",
