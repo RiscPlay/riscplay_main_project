@@ -1,4 +1,6 @@
-riscv64-unknown-elf-gcc \
+export PATH=/opt/riscv/bin:$PATH
+
+riscv32-unknown-elf-gcc \
 -march=rv32i \
 -mabi=ilp32 \
 -O0 \
@@ -11,11 +13,13 @@ riscv64-unknown-elf-gcc \
 -fno-tree-loop-distribute-patterns \
 -fno-unwind-tables \
 -fno-exceptions \
--nostdlib \
+-nostartfiles \
 -Wl,--gc-sections \
 -T linker.ld \
 startup.S $1 \
 -lgcc \
+-lc \
+-lnosys \
 -o firmware.elf 
 
-riscv64-unknown-elf-objcopy -O binary firmware.elf firmware.bin
+riscv32-unknown-elf-objcopy -O binary firmware.elf firmware.bin

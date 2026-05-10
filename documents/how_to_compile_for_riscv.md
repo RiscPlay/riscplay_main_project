@@ -1,4 +1,4 @@
-Files need to compile beyond  main.c:
+# Files need to compile beyond  main.c:
 ### linker.ld
 ```ld
 
@@ -81,86 +81,44 @@ hang:
     j hang
 ```
 
-### To compile:
+# To install C compiler:
 ```bash
-riscv32-unknown-elf-gcc \
--march=rv32im \
--mabi=ilp32 \
--O2 \
--nostdlib \
--T linker.ld \
-startup.S main.c \
--o firmware.elf
-```
-or
-
-```bash
-riscv32-unknown-elf-gcc \
--march=rv32im \
--mabi=ilp32 \
--ffreestanding \
--nostdlib \
--O2 \
-startup.S main.c \
--T linker.ld \
--o firmware.elf
-```
-or
-```bash
-riscv32-unknown-elf-gcc \
--march=rv32im \
--mabi=ilp32 \
--ffreestanding \
--fno-builtin \
--nostdlib \
-startup.S main.c \
--T linker.ld \
--o firmware.elf
+git clone https://github.com/riscv-collab/riscv-gnu-toolchain.git
+cd riscv-gnu-toolchain
+git checkout 2026.05.06
+./configure --prefix=/opt/riscv --with-arch=rv32i --with-abi=ilp32
+sudo make newlib -j$(nproc)
 ```
 
-or 
+# To compile:
 ```bash
+export PATH=/opt/riscv/bin:$PATH
 riscv32-unknown-elf-gcc \
--march=rv32im \
--mabi=ilp32 \
--O2 \
--ffreestanding \
--fno-builtin \
--fdata-sections \
--ffunction-sections \
--nostdlib \
--Wl,--gc-sections \
--T linker.ld \
-startup.S main.c \
--o firmware.elf
-```
-or
-
-```bash
-riscv64-unknown-elf-gcc \
 -march=rv32i \
 -mabi=ilp32 \
--O2 \
--mno-mul -mno-div \
+-O0 \
 -ffreestanding \
 -fno-builtin \
 -fno-tree-vectorize \
 -fdata-sections \
 -ffunction-sections \
 -fno-asynchronous-unwind-tables \
+-fno-tree-loop-distribute-patterns \
 -fno-unwind-tables \
 -fno-exceptions \
--nostdlib \
+-nostartfiles \
 -Wl,--gc-sections \
 -T linker.ld \
-startup.S main.c \
--o firmware.elf
+startup.S $1 \
+-lgcc \
+-lc \
+-lnosys \
+-o firmware.elf 
 ```
 
 ### Transform elf in bin 
 
 ```bash
+export PATH=/opt/riscv/bin:$PATH
 riscv32-unknown-elf-objcopy -O binary firmware.elf firmware.bin
 ```
-
-
