@@ -1,3 +1,4 @@
+export PATH=/opt/riscv/bin:$PATH
 riscv32-unknown-elf-gcc \
 -march=rv32i \
 -mabi=ilp32 \
