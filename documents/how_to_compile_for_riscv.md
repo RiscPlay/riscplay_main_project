@@ -122,3 +122,5 @@ startup.S $1 \
 export PATH=/opt/riscv/bin:$PATH
 riscv32-unknown-elf-objcopy -O binary firmware.elf firmware.bin
 ```
+
+

@@ -12,15 +12,14 @@ module pll (
 
 wire clk_from_pll;
 wire clk_from_pll_90d;
-wire lock;
 wire clk;
 `ifdef use_clock_of_72mhz
-Gowin_rPLL__72mhz main_clock_used(
+Gowin_rPLL__74Dot25mhz main_clock_used(
      .clkout(clk), //output clkout
      .clkoutp(clkoutp),
-     .clkin(clkin) //input clkin
+     .clkin(clkin), //input clkin
+     .lock(lock)
 );
-assign lock=1'b1;
 `endif
 
 

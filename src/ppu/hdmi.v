@@ -5,8 +5,11 @@ module HDMI(
     output            O_tmds_clk_p    ,
     output            O_tmds_clk_n    ,
     output     [2:0]  O_tmds_data_p   ,//{r,g,b}
-    output     [2:0]  O_tmds_data_n   
-
+    output     [2:0]  O_tmds_data_n   ,
+    input  wire       pix_clk,  
+    input  wire       pll_lock,
+    input  wire       serial_clk,
+    input  wire       hdmi4_rst_n
 );
 wire        I_rst_n;
 assign      I_rst_n = ~I_rst;
@@ -28,44 +31,27 @@ reg  [9:0]  cnt_vs;
 
 //------------------------------------
 //HDMI4 TX
-wire serial_clk;
-wire pll_lock;
-
-wire hdmi4_rst_n;
-
-wire pix_clk;
-CLKDIV u_clkdiv
-(.RESETN(hdmi4_rst_n)
-,.HCLKIN(serial_clk) //clk  x5
-,.CLKOUT(pix_clk)    //clk  x1
-,.CALIB (1'b1)
-);
-defparam u_clkdiv.DIV_MODE="5";
-defparam u_clkdiv.GSREN="false";
-
-TMDS_rPLL u_tmds_rpll
-(.clkin     (I_clk     )     //input clk 
-,.clkout    (serial_clk)     //output clk 
-,.lock      (pll_lock  )     //output lock
-);
 
 
 reg [31:0]  counter_init;
 reg [2:0]  mode_reg1;
 always @(posedge pix_clk ) begin
     if(pll_lock==1'b1) begin
-        if(counter_init>32'h00ff0000) begin
-            //counter_init=32'h00000000;
-            if(mode_reg1<=3'b001)
+        
+        if(counter_init>32'h000ff000) begin
+            counter_init<=32'h00000000;
+            if(mode_reg1!=3'b110)
                 mode_reg1<=mode_reg1+3'b001;
 
         end
         else begin
             counter_init<=counter_init+32'h00000001;
         end
+    
     end
     else begin
         counter_init<=32'h00000000;
+        mode_reg1<=3'b000;
     end
 end
 

@@ -9,15 +9,12 @@ module MAIN_MEMORY (
     input  wire [31:0] din
 );
 
-    // 4K words de 32 bits
+
+    `ifdef SIM  
     reg [31:0] mem [0:4095];
-
     reg [11:0] addr_reg;
-
-     // só em simulação (ex: iverilog -DSIM)
     reg [31:0] dout;
     assign dout_wire=dout;
-    `ifdef SIM  
     initial begin
         $display("Loading memory from mem.hex...");
         $readmemh("../tests/test_c/bubble_sort.hex", mem);

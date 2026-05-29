@@ -36,6 +36,10 @@
         <div class="col" hx-get="view_memory_v2.html" hx-trigger="load">
         </div>
       </div>
+      <div class="row py-1">
+        <div class="col" hx-get="edit_sdram.html" hx-trigger="load">
+        </div>
+      </div>
     </div>
   </div>
   <script>
@@ -123,6 +127,9 @@
         display_format: "hexadecimal__format___little_endian",
         highlight_addr:"",
         last_memory_addr_that_user_sent_to_get_memory:0,
+        sdram_buffer_write: new Array(64).fill(0),
+        sdram_addr_to_write_buffer:"000000",
+        sdram_addr_to_read:"000000",
         memory_view: {
           "mem": []
         },
@@ -188,6 +195,59 @@
           }
 
           this.hex = hex;
+        },
+        async sendBuffer() {
+          this.sdram_addr_to_write_buffer;
+          var addr_hex_to_set_buffer = toHex32((1<<22)+(0x101<<13));
+          var data_to_send=""
+          for(let i=0;i<this.sdram_buffer_write.length;i++){
+            data_to_send=data_to_send+toHex32(parseInt(this.sdram_buffer_write[i],16))
+          }
+          try {
+              var response = await fetch(addr_serv + "/send_data", {
+                method: "POST",
+                body: addr_hex_to_set_buffer + data_to_send
+              });
+            } catch {
+              this.error = true;
+              return;
+          }
+          var code = response.status;
+          if (code != 200) {
+              this.error = true;
+              return;
+          }
+          var op_write=1;
+          var data_len=this.sdram_buffer_write.length;
+          var addr_sdram=parseInt(this.sdram_addr_to_write_buffer,16);
+          var data_to_send = toHex32( (addr_sdram<<9)+(data_len<<2) +op_write);
+          addr_hex_to_set_buffer=toHex32((1<<22)+(1<<21));
+          try {
+              var response = await fetch(addr_serv + "/send_data", {
+                method: "POST",
+                body: addr_hex_to_set_buffer + data_to_send
+              });
+            } catch {
+              this.error = true;
+              return;
+          }
+        },
+        async getSDRAM() {
+   
+          var op_read=0;
+          var data_len=this.sdram_buffer_write.length;
+          var addr_sdram=parseInt(this.sdram_addr_to_read,16);
+          var data_to_send = toHex32( (addr_sdram<<9)+(data_len<<2) +op_read);
+          addr_hex_to_set_buffer=toHex32((1<<22)+(1<<21));
+          try {
+              var response = await fetch(addr_serv + "/send_data", {
+                method: "POST",
+                body: addr_hex_to_set_buffer + data_to_send
+              });
+            } catch {
+              this.error = true;
+              return;
+          }
         },
         async sendFile() {
 

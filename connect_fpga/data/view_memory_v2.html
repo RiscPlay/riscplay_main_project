@@ -1,70 +1,69 @@
-  <div class="row" style="position: sticky; top: 0;  z-index: 1000; background-color: #1f252e;">
-      <div class="col">
-          <div class="row">
-              <div class="col">
-                  <h3>View memory</h3>
-              </div>
-          </div>
-          <div class="row">
-              <div class="col-6">
-                  <div class="input-group mb-3">
-                      <span class="input-group-text" id="add-on-1">Addr n hex</span>
-                      <input type="text" x-model="addr_of_the_memory_to_watch" class="form-control"
-                          placeholder="80000000" aria-label="Username" aria-describedby="add-on-1"
-                          oninput="this.value = this.value.toUpperCase().replace(/[^0-9A-F]/g, ''); if (this.value.length > 8) { this.value = this.value.slice(0, 8);} if (this.value && parseInt(this.value, 16) > 0xFFFFFFFF) { this.value = 'FFFFFFFF'; }">
-                  </div>
-              </div>
-              <div class="col-4">
-                  <div class="input-group mb-3">
-                      <span class="input-group-text" id="add-on-1">Amount</span>
-                      <input type="number" x-model="amount_to_read" min="1" step="1" max="2048" class="form-control"
-                          placeholder="100" aria-label="Username" aria-describedby="add-on-1"
-                          oninput=" this.value = this.value.replace(/[^0-9]/g, ''); if (this.value > 2048) this.value = 2048;">
-                  </div>
-              </div>
-              <div class="col-2">
-                  <button @click="recvData()" class="btn btn-secondary">get</button>
-              </div>
+<div class="row" style="position: sticky; top: 0;  z-index: 1000; background-color: #1f252e;">
+    <div class="col">
+        <div class="row">
+            <div class="col">
+                <h3>View memory</h3>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-6">
+                <div class="input-group mb-3">
+                    <span class="input-group-text" id="add-on-1">Addr n hex</span>
+                    <input type="text" x-model="addr_of_the_memory_to_watch" class="form-control" placeholder="80000000"
+                        aria-label="Username" aria-describedby="add-on-1"
+                        oninput="this.value = this.value.toUpperCase().replace(/[^0-9A-F]/g, ''); if (this.value.length > 8) { this.value = this.value.slice(0, 8);} if (this.value && parseInt(this.value, 16) > 0xFFFFFFFF) { this.value = 'FFFFFFFF'; }">
+                </div>
+            </div>
+            <div class="col-4">
+                <div class="input-group mb-3">
+                    <span class="input-group-text" id="add-on-1">Amount</span>
+                    <input type="number" x-model="amount_to_read" min="1" step="1" max="2048" class="form-control"
+                        placeholder="100" aria-label="Username" aria-describedby="add-on-1"
+                        oninput=" this.value = this.value.replace(/[^0-9]/g, ''); if (this.value > 2048) this.value = 2048;">
+                </div>
+            </div>
+            <div class="col-2">
+                <button @click="recvData()" class="btn btn-secondary">get</button>
+            </div>
 
-          </div>
+        </div>
 
-          <div class="row">
-              <div class="col-6">
-                  <div class="mb-3">
-                      <label for="display-format" class="form-label">Display format</label>
-                      <select x-model="display_format" class="form-select" id="example-select-1">
-                          <option value="hexadecimal__format___little_endian" selected>Hexadecimal little endian
-                          </option>
-                          <option value="hexadecimal__format___big_endian" selected>Hexadecimal big endian</option>
-                          <option value="sixteenbits_signed__format">16 bits signed little_endian</option>
-                          <option value="eightbits_signed__format">8 bits signed little_endian</option>
-                      </select>
-                  </div>
-              </div>
-              <div class="col-6">
-                  <div class="mb-3">
+        <div class="row">
+            <div class="col-6">
+                <div class="mb-3">
+                    <label for="display-format" class="form-label">Display format</label>
+                    <select x-model="display_format" class="form-select" id="example-select-1">
+                        <option value="hexadecimal__format___little_endian" selected>Hexadecimal little endian
+                        </option>
+                        <option value="hexadecimal__format___big_endian" selected>Hexadecimal big endian</option>
+                        <option value="sixteenbits_signed__format">16 bits signed little_endian</option>
+                        <option value="eightbits_signed__format">8 bits signed little_endian</option>
+                    </select>
+                </div>
+            </div>
+            <div class="col-6">
+                <div class="mb-3">
 
-                      <label for="example-input-1" class="form-label">Highlight Addr</label>
-                      <input type="text" class="form-control" x-model="highlight_addr" style="cursor: default;" readonly>
+                    <label for="example-input-1" class="form-label">Highlight Addr</label>
+                    <input type="text" class="form-control" x-model="highlight_addr" style="cursor: default;" readonly>
 
-                  </div>
-              </div>
-          </div>
-      </div>
-  </div>
-  <div class="row">
-      <div class="col">
-          <div class="docs-card docs-card-alt card  p-20">
-              <div class="card-body p-2" tabindex="0" @keydown.left="movehighlight(-1)"
-                  @keydown.right="movehighlight(1)">
-                  <div style="font-family: monospace;">
-                      <template x-for="(cell,i) in memory_view.mem" :key="i">
-                          <span @click="format_memory(i)" x-text="cell[display_format]" :style="cell.style"
-                              :class="cell.class">
-                          </span>
-                      </template>
-                  </div>
-              </div>
-          </div>
-      </div>
-  </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="row">
+    <div class="col">
+        <div class="docs-card docs-card-alt card  p-20">
+            <div class="card-body p-2" tabindex="0" @keydown.left="movehighlight(-1)" @keydown.right="movehighlight(1)">
+                <div style="font-family: monospace;">
+                    <template x-for="(cell,i) in memory_view.mem" :key="i">
+                        <span @click="format_memory(i)" x-text="cell[display_format]" :style="cell.style"
+                            :class="cell.class">
+                        </span>
+                    </template>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

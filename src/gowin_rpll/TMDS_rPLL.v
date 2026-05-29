@@ -1,10 +1,11 @@
-//Copyright (C)2014-2022 Gowin Semiconductor Corporation.
+//Copyright (C)2014-2025 Gowin Semiconductor Corporation.
 //All rights reserved.
 //File Title: IP file
-//GOWIN Version: V1.9.8.09
+//Tool Version: V1.9.11.03 Education
 //Part Number: GW2AR-LV18QN88C8/I7
-//Device: GW2AR-18C
-//Created Time: Wed Jan 11 16:32:24 2023
+//Device: GW2AR-18
+//Device Version: C
+//Created Time: Tue May 26 14:09:52 2026
 
 module TMDS_rPLL (clkout, lock, clkin);
 

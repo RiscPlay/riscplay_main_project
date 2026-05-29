@@ -21,6 +21,7 @@ always @(posedge clk) begin
 
 end
 always @(posedge clk) begin
+    
     if(mem[0]>32'h00000000) begin
         leds[0]<=1'b0;
     end

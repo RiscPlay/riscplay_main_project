@@ -163,6 +163,7 @@ always @(posedge clk) begin
                     end
                 end
                 else begin
+                    addr_main_memory<=32'h00000000;
                     state<=STATE_FINISH;
                 end
             end

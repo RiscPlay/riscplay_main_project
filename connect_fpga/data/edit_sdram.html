@@ -1,0 +1,62 @@
+<div class="row" style="position: sticky; top: 0;  z-index: 1000; background-color: #1f252e;">
+    <div class="col">
+        <h3>Edit SDRAM</h3>
+        <div class="row">
+            <div class="col">
+                <h5>Put sdram data in main memory</h5>
+                <p>The will be the first 64 words of sdram starting of address sdram defined bellow.</p>
+                <p>The sdram will placed in the address 0x400000 - 0x400040 of the main memory</p>
+                <div class="row">
+                    <div class="col-12 col-sm-12 col-md-6 col-lg-4">
+                        <div class="input-group mb-3" style="max-width: 25em;">
+                            <span class="input-group-text" id="add-on-1">Addr in sdram to get data</span>
+                            <input type="text" x-model="sdram_addr_to_read" class="form-control"
+                                placeholder="000000" aria-label="Username" aria-describedby="add-on-1"
+                                oninput="this.value = this.value.toUpperCase().replace(/[^0-9A-F]/g, ''); if (this.value.length > 6) { this.value = this.value.slice(0, 6);} if (this.value && parseInt(this.value, 16) > 0x200000) { this.value = '1FFFFF'; }">
+                        </div>
+                    </div>
+                    <div class="col-5 col-lg-2">
+                        <button @click="getSDRAM()" class="btn btn-secondary">Get sdram data</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="row py-3" >
+            <div class="col">
+                <h5>Set Buffer</h5>
+                <div class="row">
+                    <div class="col-12 col-sm-12 col-md-6 col-lg-4">
+                        <div class="input-group mb-3" style="max-width: 25em;">
+                            <span class="input-group-text" id="add-on-1">Addr in sdram to write buffer</span>
+                            <input type="text" x-model="sdram_addr_to_write_buffer" class="form-control"
+                                placeholder="000000" aria-label="Username" aria-describedby="add-on-1"
+                                oninput="this.value = this.value.toUpperCase().replace(/[^0-9A-F]/g, ''); if (this.value.length > 6) { this.value = this.value.slice(0, 6);} if (this.value && parseInt(this.value, 16) > 0x200000) { this.value = '1FFFFF'; }">
+                        </div>
+                    </div>
+                    <div class="col-5 col-lg-2">
+                        <button @click="sendBuffer()" class="btn btn-secondary">send buffer</button>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col">
+                        <div class="row py-2">
+                            <div class="col">Buffer</div>
+                        </div>
+                        <div class="row">
+                            <div class="col">
+                                <template x-for="(buffer, i) in sdram_buffer_write" :key="i">
+                                    <div style="display: inline; padding-left: 0ch;padding-right: 2ch;">
+                                    <input style="max-width: 7em; display: inline; margin-bottom: 10px;" type="text"
+                                        x-model="sdram_buffer_write[i]" class="form-control" placeholder="80000000"
+                                        aria-label="Username" aria-describedby="add-on-1"
+                                        oninput="this.value = this.value.toUpperCase().replace(/[^0-9A-F]/g, ''); if (this.value.length > 8) { this.value = this.value.slice(0, 8);} if (this.value && parseInt(this.value, 16) > 0xFFFFFFFF) { this.value = 'FFFFFFFF'; }">
+                                        </div>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

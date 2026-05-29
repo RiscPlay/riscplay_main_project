@@ -135,6 +135,7 @@ always @(posedge clk) begin
                 end
             end
             STATE_WAIT_CRC_FINISH_P0: begin
+                addr_main_memory<=32'h00000000;
                 wre_main_memory<=1'b0;
                 din_main_memory<=32'h00000000;
                 if(ready_for_recv_data) begin
