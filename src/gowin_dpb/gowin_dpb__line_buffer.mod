@@ -1,0 +1,24 @@
+-series GW2AR
+-device GW2AR-18
+-device_version C
+-package QFN88
+-part_number GW2AR-LV18QN88C8/I7
+
+
+-mod_name Gowin_DPB__LINE_BUFFER
+-file_name gowin_dpb__line_buffer
+-path C:/Users/kite/workspace/riscplay_main_project/src/gowin_dpb/
+-type RAM_DP
+-file_type vlg
+-bram_b true
+-dev_type GW2AR-18C
+-depth_0 1280
+-depth_1 1280
+-width_0 32
+-width_1 32
+-read_mode_0 bypass
+-read_mode_1 bypass
+-write_mode_0 normal
+-write_mode_1 normal
+-speed true
+-reset_mode sync

@@ -74,7 +74,7 @@ TMDS_rPLL u_tmds_rpll
 ,.clkout    (serial_clk)     //output clk 
 ,.lock      (lock_pll  )     //output lock
 );
-
+wire [31:0] debug_signal_draw;
 HDMI hdmi_inst(
     .I_clk(I_clk),
     .I_rst(I_rst),
@@ -85,8 +85,13 @@ HDMI hdmi_inst(
     .pll_lock(lock_pll),
     .pix_clk(clk),
     .hdmi4_rst_n(hdmi4_rst_n),
-    .serial_clk(serial_clk)
-
+    .serial_clk(serial_clk),
+    .rst_n_paint(n_reset_global),
+    .addr_sdram_manager__hdmi_controller(addr_sdram_manager__hdmi_controller),
+    .din_sdram_manager__hdmi_controller(din_sdram_manager__hdmi_controller),
+    .dout_sdram_manager__hdmi_controller(dout_sdram_manager__hdmi_controller),
+    .wre_sdram_manager__hdmi_controller(wre_sdram_manager__hdmi_controller),
+    .debug_signal_draw(debug_signal_draw)
 );
 `endif
 
@@ -119,7 +124,6 @@ always @(posedge clk) begin
     if(lock_pll) begin
         if(count_for_reset==4'ha) begin
             reset_ram<=1'b0;
-            led<=6'b001011;
         end
         else begin
             reset_ram<=1'b1;
@@ -128,7 +132,6 @@ always @(posedge clk) begin
     end
     else begin
         reset_ram<=1'b1;
-        led<=6'b111111;
     end
 end
 
@@ -148,7 +151,6 @@ always @(posedge clk) begin
         n_reset_global<=1'b0;
     end
 end
-
 
 
 
@@ -197,7 +199,11 @@ end
       .O_sdrc_init_done(O_sdrc_init_done),
       .O_sdrc_cmd_ack(O_sdrc_cmd_ack)
   );
-
+wire [21:0]  addr_sdram_manager__hdmi_controller;
+wire [31:0]  din_sdram_manager__hdmi_controller;
+wire [31:0]  dout_sdram_manager__hdmi_controller;
+wire         wre_sdram_manager__hdmi_controller;
+wire         processing_request_from__hdmi_controller;
 wire [21:0]  addr_sdram_manager__mapper;
 wire [31:0]  din_sdram_manager__mapper;
 wire [31:0]  dout_sdram_manager__mapper;
@@ -209,7 +215,11 @@ sdram_manager sdram_manager__ins(
     .din_sdram_manager__mapper(din_sdram_manager__mapper),
     .dout_sdram_manager__mapper(dout_sdram_manager__mapper),
     .wre_sdram_manager__mapper(wre_sdram_manager__mapper),
-
+    .addr_sdram_manager__hdmi_controller(addr_sdram_manager__hdmi_controller),
+    .din_sdram_manager__hdmi_controller(din_sdram_manager__hdmi_controller),
+    .dout_sdram_manager__hdmi_controller(dout_sdram_manager__hdmi_controller),
+    .wre_sdram_manager__hdmi_controller(wre_sdram_manager__hdmi_controller),
+    .processing_request_from__hdmi_controller(processing_request_from__hdmi_controller),
     .O_sdrc_init_done(O_sdrc_init_done),
     .O_sdrc_cmd_ack(O_sdrc_cmd_ack),
     .O_sdrc_data(O_sdrc_data),
@@ -223,7 +233,6 @@ sdram_manager sdram_manager__ins(
     .I_sdrc_data(I_sdrc_data),
     .I_sdrc_data_len(I_sdrc_data_len)
 );
-
 
 
 wire reset_cpu;
@@ -331,11 +340,12 @@ mapper mapper_ins(
     .addr_sdram_manager(addr_sdram_manager__mapper),
     .din_sdram_manager(din_sdram_manager__mapper),
     .dout_sdram_manager(dout_sdram_manager__mapper),
-    .wre_sdram_manager(wre_sdram_manager__mapper)
+    .wre_sdram_manager(wre_sdram_manager__mapper),
+    .debug_signal_draw(debug_signal_draw)
 );
 
 
-rv32im_cpu rv32im_cpu_inst(
+rv32im_cpu___ppu rv32im_cpu_inst(
     .clk(clk),
     .reset(reset_cpu|(~lock_pll)),
     .mem_addr___external(addr_main_memory___rv32im_cpu_inst),
@@ -345,7 +355,7 @@ rv32im_cpu rv32im_cpu_inst(
     .enable(1'b1)
 );
 
-/*
+
 control_leds control_leds_ins(
     .clk(clk),
     .addr_led_memory(addr_led_memory),
@@ -354,7 +364,7 @@ control_leds control_leds_ins(
     .wre_led_memory(wre_led_memory),
     .leds(led)
 );
-*/
+
 
 control_cpu control_cpu_ins(
     .clk(clk),

@@ -13,9 +13,6 @@ module sdram_manager(
     input   wire          wre_sdram_manager__mapper,
     input   wire          wre_sdram_manager__hdmi_controller,
     input   wire          wre_sdram_manager__pixel_ppu,
-    output  wire          mapper_in_control__out,
-    output  wire          hdmi_controller_in_control__out,
-    output  wire          pixel_ppu_in_control__out,
 
 
     input  wire        O_sdrc_init_done,
@@ -39,16 +36,6 @@ module sdram_manager(
 wire mapper_in_control;
 wire hdmi_controller_in_control;
 wire pixel_ppu_in_control;
-
-assign mapper_in_control__out=mapper_in_control;
-assign hdmi_controller_in_control__out=hdmi_controller_in_control;
-assign pixel_ppu_in_control__out=pixel_ppu_in_control;
-wire  [21:0]  addr_sdram_manager = mapper_in_control          ? addr_sdram_manager__mapper :
-                                   hdmi_controller_in_control ? addr_sdram_manager__hdmi_controller  :
-                                   addr_sdram_manager__pixel_ppu     ;
-wire  [31:0]  din_sdram_manager  = mapper_in_control          ? din_sdram_manager__mapper :
-                                   hdmi_controller_in_control ? din_sdram_manager__hdmi_controller  :
-                                   din_sdram_manager__pixel_ppu;
 
 
 
@@ -86,9 +73,24 @@ wire wre_pulse_from_mapper;
 wire wre_pulse_from_pixel_ppu;
 wire wre_pulse_from_hdmi_controller;
 wire req__op_in_sdram;
+wire req__op_in_sdram_from_define_signals;
+
 reg  req_op_in_sdram_ack; 
 wire [31:0] addr_sdram_manager_to_process;
 wire [31:0] din_sdram_manager_to_process;
+
+
+reg  [31:0]  din_sdram_manager__mapper__buffer;
+reg  [31:0]  addr_sdram_manager__mapper__buffer;
+reg          wre_sdram_manager__mapper__buffer;
+reg  [31:0]  dout_sdram_manager__mapper__buffer;
+always @(posedge clk) begin
+    wre_sdram_manager__mapper__buffer<=wre_sdram_manager__mapper;
+    addr_sdram_manager__mapper__buffer<=addr_sdram_manager__mapper;
+    din_sdram_manager__mapper__buffer<=din_sdram_manager__mapper;
+    dout_sdram_manager__mapper<=dout_sdram_manager__mapper__buffer;
+end
+
 sdram_arbiter sdram_arbiter_ins(
     .clk(clk),
     .rst_n(rst_n),
@@ -132,8 +134,12 @@ wire         op_will_hapen_in_two_rows;
 wire  [20:0] addr_to_start_op_in_ram_first_row;
 wire  [20:0] addr_to_start_op_in_ram_second_row;
 define_signals_to_do_ops_in_sdram define_signals_to_do_ops_in_sdram_ins(
-
-    .din_sdram_manager(din_sdram_manager_to_process),
+    .rst_n(rst_n),
+    .clk(clk),
+    .req__op_in_sdram(req__op_in_sdram),
+    .req__op_in_sdram_from_define_signals(req__op_in_sdram_from_define_signals),
+    .req_op_in_sdram_ack_to_external_signals(req_op_in_sdram_ack),
+    .din_sdram_manager_extern(din_sdram_manager_to_process),
     .op(op),
     .op_will_hapen_in_two_rows(op_will_hapen_in_two_rows),
     .amount_of_data_in_first_row_minus_1(amount_of_data_in_first_row_minus_1),
@@ -146,9 +152,7 @@ define_signals_to_do_ops_in_sdram define_signals_to_do_ops_in_sdram_ins(
 
 
 
-
-
-assign busy=busy_intern |req__op_in_sdram;
+assign busy=busy_intern |req__op_in_sdram |req__op_in_sdram_from_define_signals;
 wire sync__state=state_prev==state;
 
 always @(posedge clk) begin
@@ -198,10 +202,10 @@ always @(posedge clk) begin
     if(addr_sdram_manager__mapper____in_region_to_write_in__wr_data_r && wre_pulse_from_mapper) begin
         wr_data_r__mapper[addr_sdram_manager__mapper[5:0]]<=din_sdram_manager__mapper;
     end
-    if(addr_sdram_manager__pixel_ppu____in_region_to_write_in__wr_data_r && wre_pulse_from_pixel_ppu) begin
+    if(addr_sdram_manager__pixel_ppu____in_region_to_write_in__wr_data_r && wre_sdram_manager__pixel_ppu) begin
         wr_data_r__pixel_ppu[addr_sdram_manager__pixel_ppu[5:0]]<=din_sdram_manager__pixel_ppu;
     end
-    if(addr_sdram_manager__hdmi_controller____in_region_to_write_in__wr_data_r && wre_pulse_from_hdmi_controller) begin
+    if(addr_sdram_manager__hdmi_controller____in_region_to_write_in__wr_data_r && wre_sdram_manager__hdmi_controller) begin
         wr_data_r__hdmi_controller[addr_sdram_manager__hdmi_controller[5:0]]<=din_sdram_manager__hdmi_controller;
     end
 end
@@ -225,39 +229,55 @@ localparam get_amount_of_data_in_secon_r =   22'b1000000000000000010001;
 localparam get_proc_req_from__mapper     =   22'b1000000000000000010010;
 localparam ger_proc_req_from__hdmi_ctrl  =   22'b1000000000000000010011;
 localparam get_proc_req_from__pixel_ppu  =   22'b1000000000000000010100;
+localparam get_addr__hdmi_controller     =   22'b1000000000000000010101;
+localparam get_wre__hdmi_controller      =   22'b1000000000000000010110;
+
+assign dout_sdram_manager__hdmi_controller=   addr_sdram_manager__hdmi_controller[21]==1'b0 ? rd_data_r__hdmi_controller[addr_sdram_manager__hdmi_controller[5:0]] : 32'h000000;
 always @(posedge clk) begin
     if(addr_sdram_manager__pixel_ppu[21]==1'b0) begin
         dout_sdram_manager__pixel_ppu<= rd_data_r__pixel_ppu[addr_sdram_manager__pixel_ppu[5:0]]; 
     end
+    /****
     if(addr_sdram_manager__hdmi_controller[21]==1'b0) begin
         dout_sdram_manager__hdmi_controller<= rd_data_r__hdmi_controller[addr_sdram_manager__hdmi_controller[5:0]]; 
     end
-    if(addr_sdram_manager__mapper[21]==1'b0) begin
-        dout_sdram_manager__mapper<= rd_data_r__mapper[addr_sdram_manager__mapper[5:0]]; 
+    ****/
+    
+    if(addr_sdram_manager__mapper[21:16]==6'b000000) begin
+        dout_sdram_manager__mapper__buffer<= rd_data_r__mapper[addr_sdram_manager__mapper[5:0]]; 
+    end
+    /***
+    else if(addr_sdram_manager__mapper[21:16]==6'b000001) begin
+        dout_sdram_manager__mapper__buffer<= rd_data_r__hdmi_controller[addr_sdram_manager__mapper[5:0]]; 
     end
     else if(addr_sdram_manager__mapper==addr_to_get_busy) begin
-        dout_sdram_manager__mapper<=busy_intern; //|req__op_in_sdram;
+        dout_sdram_manager__mapper__buffer<=busy_intern; //|req__op_in_sdram;
     end
     else if (addr_sdram_manager__mapper==get_op_happen_in_two_rows) begin
-        dout_sdram_manager__mapper<={31'b0,op_will_hapen_in_two_rows}; ;
+        dout_sdram_manager__mapper__buffer<={31'b0,op_will_hapen_in_two_rows}; ;
     end
     else if (addr_sdram_manager__mapper ==get_amount_of_data_in_first_r) begin
-        dout_sdram_manager__mapper<={26'b0,amount_of_data_in_first_row_minus_1};
+        dout_sdram_manager__mapper__buffer<={26'b0,amount_of_data_in_first_row_minus_1};
     end
     else if (addr_sdram_manager__mapper ==get_amount_of_data_in_secon_r) begin
-        dout_sdram_manager__mapper<={26'b0,amount_of_data_in_second_row_minus_1};
+        dout_sdram_manager__mapper__buffer<={26'b0,amount_of_data_in_second_row_minus_1};
     end
     else if(addr_sdram_manager__mapper==get_proc_req_from__mapper) begin
-        dout_sdram_manager__mapper<={31'b0,processing_request_from__mapper__latch};
+        dout_sdram_manager__mapper__buffer<={31'b0,processing_request_from__mapper__latch};
     end
     else if(addr_sdram_manager__mapper==ger_proc_req_from__hdmi_ctrl) begin
-        dout_sdram_manager__mapper<={31'b0,processing_request_from__hdmi_controller};
+        dout_sdram_manager__mapper__buffer<={31'b0,processing_request_from__hdmi_controller};
     end
     else if(addr_sdram_manager__mapper==get_proc_req_from__pixel_ppu) begin
-        dout_sdram_manager__mapper<={31'b0,processing_request_from__pixel_ppu};
+        dout_sdram_manager__mapper__buffer<={31'b0,processing_request_from__pixel_ppu};
     end
+    else if(addr_sdram_manager__mapper==get_addr__hdmi_controller)
+        dout_sdram_manager__mapper__buffer<={10'b0,addr_sdram_manager__hdmi_controller};
+    else if(addr_sdram_manager__mapper==get_wre__hdmi_controller)
+        dout_sdram_manager__mapper__buffer<={31'b0,wre_sdram_manager__hdmi_controller};
+    ***/
     else begin
-        dout_sdram_manager__mapper<=32'h00000000;
+        dout_sdram_manager__mapper__buffer<=32'h00000000;
     end
 end
 
@@ -324,7 +344,7 @@ always @(posedge clk) begin
             end
             STATE_IDLE: begin     
                 req_op_in_sdram_ack<=1'b0;
-                if(req__op_in_sdram) begin
+                if(req__op_in_sdram_from_define_signals) begin
                     point_to___rd_data_r<=6'b000000;
                     point_to___wr_data_r<=6'b000000;
                     I_sdrc_addr <= {w_bank,w_line,8'h0};

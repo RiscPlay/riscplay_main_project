@@ -7,7 +7,7 @@ app = Flask(__name__)
 CORS(app)
 
 # O IP do seu ESP32
-ESP32_URL = "http://192.168.4.101"
+ESP32_URL = "http://192.168.4.102"
 
 @app.route('/<path:path>', methods=['GET', 'POST', 'OPTIONS'])
 def proxy(path):

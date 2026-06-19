@@ -1,15 +1,23 @@
 
 module HDMI(
-    input   wire      I_clk           ,
-    input             I_rst           ,
-    output            O_tmds_clk_p    ,
-    output            O_tmds_clk_n    ,
-    output     [2:0]  O_tmds_data_p   ,//{r,g,b}
-    output     [2:0]  O_tmds_data_n   ,
-    input  wire       pix_clk,  
-    input  wire       pll_lock,
-    input  wire       serial_clk,
-    input  wire       hdmi4_rst_n
+    input  wire        I_clk           ,
+    input              I_rst           ,
+    output             O_tmds_clk_p    ,
+    output             O_tmds_clk_n    ,
+    output      [2:0]  O_tmds_data_p   ,//{r,g,b}
+    output      [2:0]  O_tmds_data_n   ,
+    output wire [21:0] addr_sdram_manager__hdmi_controller,
+    output wire [31:0] din_sdram_manager__hdmi_controller,
+    input  wire [31:0] dout_sdram_manager__hdmi_controller,
+    output wire        wre_sdram_manager__hdmi_controller,
+    input  wire        processing_request_from__hdmi_controller,
+    input  wire        pix_clk,  
+    input  wire        pll_lock,
+    input  wire        serial_clk,
+    input  wire        hdmi4_rst_n,
+    input  wire        rst_n_paint,
+	output wire [31:0] debug_signal_draw
+
 );
 wire        I_rst_n;
 assign      I_rst_n = ~I_rst;
@@ -54,7 +62,6 @@ always @(posedge pix_clk ) begin
         mode_reg1<=3'b000;
     end
 end
-
 //===========================================================================
 //testpattern
 TestPattern testpattern_inst
@@ -80,7 +87,14 @@ TestPattern testpattern_inst
     .O_vs        (tp0_vs_in          ),
     .O_data_r    (tp0_data_r         ),   
     .O_data_g    (tp0_data_g         ),
-    .O_data_b    (tp0_data_b         )
+    .O_data_b    (tp0_data_b         ),
+    .rst_n_paint(rst_n_paint),
+    .addr_sdram_manager__hdmi_controller(addr_sdram_manager__hdmi_controller),
+    .din_sdram_manager__hdmi_controller(din_sdram_manager__hdmi_controller),
+    .dout_sdram_manager__hdmi_controller(dout_sdram_manager__hdmi_controller),
+    .wre_sdram_manager__hdmi_controller(wre_sdram_manager__hdmi_controller),
+    .processing_request_from__hdmi_controller(processing_request_from__hdmi_controller),
+    .debug_signal_draw(debug_signal_draw)
 );
 
 always@(posedge pix_clk)

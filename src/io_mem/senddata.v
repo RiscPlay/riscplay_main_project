@@ -178,7 +178,7 @@ always @(posedge clk) begin
             end
             STATE_FINISH: begin
                 stopped<=1'b1;
-            end            
+            end
         endcase
     end
 end

@@ -10,22 +10,35 @@
         <File path="src/control_cpu/shutdown_and_start_cpu.sv" type="file.verilog" enable="1"/>
         <File path="src/control_leds/control_leds.v" type="file.verilog" enable="1"/>
         <File path="src/dvi_tx/dvi_tx.v" type="file.verilog" enable="1"/>
+        <File path="src/gowin_dpb/gowin_dpb__line_buffer.v" type="file.verilog" enable="1"/>
         <File path="src/gowin_rpll/Gowin_rPLL__74Dot25mhz.v" type="file.verilog" enable="1"/>
         <File path="src/gowin_rpll/TMDS_rPLL.v" type="file.verilog" enable="1"/>
         <File path="src/gowin_sp/gowin_sp_sram_main_memory.v" type="file.verilog" enable="1"/>
-        <File path="src/io_mem/sdram_manager.v" type="file.verilog" enable="1"/>
-        <File path="src/io_mem/sdram_arbiter.v" type="file.verilog" enable="1"/>
         <File path="src/io_mem/define_signals_to_do_ops_in_sdram.v" type="file.verilog" enable="1"/>
         <File path="src/io_mem/main_memory.v" type="file.verilog" enable="1"/>
         <File path="src/io_mem/mapper.v" type="file.verilog" enable="1"/>
         <File path="src/io_mem/recvdata.v" type="file.verilog" enable="1"/>
+        <File path="src/io_mem/sdram_arbiter.v" type="file.verilog" enable="1"/>
+        <File path="src/io_mem/sdram_manager.v" type="file.verilog" enable="1"/>
         <File path="src/io_mem/senddata.v" type="file.verilog" enable="1"/>
         <File path="src/math_modules/fibonacci/fibonacci.v" type="file.verilog" enable="1"/>
         <File path="src/pll.v" type="file.verilog" enable="1"/>
         <File path="src/ppu/hdmi.v" type="file.verilog" enable="1"/>
         <File path="src/ppu/testpattern.v" type="file.verilog" enable="1"/>
+        <File path="src/ppu/line_buffer_pingpong.v" type="file.verilog" enable="1"/>
+        <File path="src/ppu/line_buffer_pingpong_rgb.v" type="file.verilog" enable="1"/>
+
         <File path="src/riscvrv32im/cpu__riscvrv32im.sv" type="file.verilog" enable="1"/>
         <File path="src/riscvrv32im/memory_control.v" type="file.verilog" enable="1"/>
+
+
+
+        <File path="src/ppu/riscv/rv32im_cpu___ppu.sv" type="file.verilog" enable="1"/>
+        <File path="src/ppu/riscv/memory_control___ppu.v" type="file.verilog" enable="1"/>
+        <File path="src/ppu/riscv/divider32___ppu.v" type="file.verilog" enable="1"/>
+        <File path="src/ppu/riscv/mul32___ppu.v" type="file.verilog" enable="1"/>
+
+
         <File path="src/sdram_ip/sdram_controller_hs.v" type="file.verilog" enable="1"/>
         <File path="src/spi/consumer_spi.v" type="file.verilog" enable="1"/>
         <File path="src/spi/spi.v" type="file.verilog" enable="1"/>

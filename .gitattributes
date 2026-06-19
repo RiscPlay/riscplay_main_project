@@ -17,3 +17,5 @@ halfmoon.modern.css filter=lfs diff=lfs merge=lfs -text
 *.bin filter=lfs diff=lfs merge=lfs -text
 *.hex filter=lfs diff=lfs merge=lfs -text
 *.whisper.txt filter=lfs diff=lfs merge=lfs -text
+.drawio filter=lfs diff=lfs merge=lfs -text
+*.drawio filter=lfs diff=lfs merge=lfs -text

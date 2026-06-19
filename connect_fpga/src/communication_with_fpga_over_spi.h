@@ -1,6 +1,7 @@
 #ifndef communication_with_fpga_over_spi
 #define communication_with_fpga_over_spi
 #define LOG__SPI_COMM
+//#define PUT_DELAY_AMONG_TRANSFFERS
 #include <stdint.h>
 #include <Arduino.h>
 #include "spi_pins.h"
@@ -63,7 +64,9 @@ bool check_if_data_was_sent_with_success(uint8_t *crc_out){
   for(int i=0;i<4;i++){
     crc_in[i]=SPI.transfer(crc_out[i]);
   }
+  #ifdef PUT_DELAY_AMONG_TRANSFFERS
   delay(1);
+  #endif
   for(int i=0;i<4;i++){
     if(crc_in[i]!=crc_out[i]){
       success=false;
@@ -107,8 +110,10 @@ bool shutdown_or_up_processor(bool enable){
   for(int i=0;i<9;i++){
     SPI.transfer(header[i]);
   }
+  #ifdef PUT_DELAY_AMONG_TRANSFFERS
   delay(1);
-  
+  #endif
+
   return check_if_data_was_sent_with_success(crc_out);
 }
 
@@ -132,7 +137,10 @@ bool send_header_to____fpga_comm_over_spi(uint8_t op,uint32_t addr,uint32_t len)
   for(int i=0;i<9;i++){
     SPI.transfer(header[i]);
   }
+  #ifdef PUT_DELAY_AMONG_TRANSFFERS
   delay(1);
+  #endif
+
   #ifdef LOG__SPI_COMM
   Serial.println("send_header_to____fpga_comm_over_spi");
   #endif
@@ -149,11 +157,16 @@ bool send_body_to____fpga_comm_over_spi(uint8_t *body,uint32_t len){
   uint32_t crc_out_uint32=calc_crc(body, len);
   uint32_to_vector_uint8(crc_out_uint32, crc_out);
   //delay(50);
+  SPI.transferBytes(body,nullptr,len);
+  /*
   for(int i=0;i<len;i++){
     
     SPI.transfer(body[i]);
   }
+  */
+  #ifdef PUT_DELAY_AMONG_TRANSFFERS
   delay(1);
+  #endif
   #ifdef LOG__SPI_COMM
   Serial.println("send_body_to____fpga_comm_over_spi");
   #endif
@@ -171,7 +184,9 @@ bool recv_body_from____fpga_comm_over_spi(uint8_t *body,uint32_t len){
   }
   uint32_t crc_out_uint32=calc_crc(body, len);
   uint32_to_vector_uint8(crc_out_uint32, crc_out);
+  #ifdef PUT_DELAY_AMONG_TRANSFFERS
   delay(1);
+  #endif
   
   #ifdef LOG__SPI_COMM
   Serial.println("recv_body_from____fpga_comm_over_spi");
@@ -194,6 +209,7 @@ bool send_uint8_vector_to_fpga(uint32_t addr,uint8_t *body,uint32_t length){
   delayMicroseconds(10);
   digitalWrite(CS, HIGH);
   SPI.endTransaction();
+  
   return success;
 }
 

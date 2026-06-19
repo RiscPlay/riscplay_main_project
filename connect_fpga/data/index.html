@@ -40,6 +40,10 @@
         <div class="col" hx-get="edit_sdram.html" hx-trigger="load">
         </div>
       </div>
+      <div class="row py-1">
+        <div class="col" hx-get="upload_img.html" hx-trigger="load">
+        </div>
+      </div>
     </div>
   </div>
   <script>
@@ -115,6 +119,38 @@
       // Convert each to signed 8-bit
       return bytes.map(b => (b & 0x80) ? formatSignedFixed8bits(b - 0x100) : formatSignedFixed8bits(b));
     }
+    async function send_64_words_32bits_to_sdram_buffer(data) {
+      var addr_hex_to_set_buffer = toHex32((1 << 22) + (0x101 << 13)); //0b11000000010000000000000
+      var addr_hex_to_set_buffer_hex32 = toHex32(addr_hex_to_set_buffer);
+      var data_to_send = ""
+      for (let j = 0; j < data.length; j++) {
+        data_to_send = data_to_send + toHex32(data[j])
+      }
+      try {
+        var response = await fetch(addr_serv + "/send_data", {
+          method: "POST",
+          body: addr_hex_to_set_buffer + data_to_send
+        });
+        return true;
+      } catch {
+        return false;
+      }
+    }
+    async function send_buffer_to_sdram(length, addr_sdram) {
+      var op_write = 1;
+      var data_len = length;
+      var data_to_send = toHex32((addr_sdram << 9) + (data_len << 2) + op_write);
+      addr_hex_to_set_buffer = toHex32((1 << 22) + (1 << 21));
+      try {
+        var response = await fetch(addr_serv + "/send_data", {
+          method: "POST",
+          body: addr_hex_to_set_buffer + data_to_send
+        });
+        return true;
+      } catch {
+        return false;
+      }
+    }
 
     function App() {
       return {
@@ -125,11 +161,14 @@
         error: false,
         memory: [],
         display_format: "hexadecimal__format___little_endian",
-        highlight_addr:"",
-        last_memory_addr_that_user_sent_to_get_memory:0,
+        highlight_addr: "",
+        last_memory_addr_that_user_sent_to_get_memory: 0,
         sdram_buffer_write: new Array(64).fill(0),
-        sdram_addr_to_write_buffer:"000000",
-        sdram_addr_to_read:"000000",
+        sdram_addr_to_write_buffer: "000000",
+        sdram_addr_to_read: "000000",
+        img_to_send: null,
+        img_words_sent:-1,
+        img_total_words:-1,
         memory_view: {
           "mem": []
         },
@@ -137,7 +176,7 @@
         format_memory(highlight_pos) {
           var cells = [];
           var word_32bits_hexa = ""
-          var memory_address_of_the_word=this.last_memory_addr_that_user_sent_to_get_memory;
+          var memory_address_of_the_word = this.last_memory_addr_that_user_sent_to_get_memory;
           for (let i = 0; i < this.memory.length; i++) {
             word_32bits_hexa = word_32bits_hexa + this.memory[i];
             if (word_32bits_hexa.length == 4)
@@ -163,20 +202,20 @@
               cells.push({
                 "hexadecimal__format___little_endian": word_32bits_hexa___little_endian,
                 "hexadecimal__format___big_endian": word_32bits_hexa,
-                "sixteenbits_signed__format": sixteen_bits_signed.low  + "  " + sixteen_bits_signed.high ,
+                "sixteenbits_signed__format": sixteen_bits_signed.low + "  " + sixteen_bits_signed.high,
                 "eightbits_signed__format": eight_bits_signed[0] + "  " + eight_bits_signed[1] + "  " +
                   eight_bits_signed[2] + "  " + eight_bits_signed[3],
                 "class": cell_class,
                 "style": style,
-                "memory_address_of_the_word":memory_address_of_the_word
+                "memory_address_of_the_word": memory_address_of_the_word
               });
-              memory_address_of_the_word=memory_address_of_the_word+1;
+              memory_address_of_the_word = memory_address_of_the_word + 1;
               word_32bits_hexa = "";
             }
           }
           this.memory_view.mem = cells
           this.highlight_pos = highlight_pos;
-          this.highlight_addr=cells[highlight_pos].memory_address_of_the_word.toString(16);;
+          this.highlight_addr = cells[highlight_pos].memory_address_of_the_word.toString(16);;
         },
         movehighlight(inc_highlight_pos) {
           if ((this.highlight_pos + inc_highlight_pos) >= 0 && (this.highlight_pos + inc_highlight_pos) < this
@@ -198,55 +237,36 @@
         },
         async sendBuffer() {
           this.sdram_addr_to_write_buffer;
-          var addr_hex_to_set_buffer = toHex32((1<<22)+(0x101<<13));
-          var data_to_send=""
+          var addr_sdram = parseInt(this.sdram_addr_to_write_buffer, 16);
+          var sdram_buffer_write_int=new Uint32Array(this.sdram_buffer_write.length);
           for(let i=0;i<this.sdram_buffer_write.length;i++){
-            data_to_send=data_to_send+toHex32(parseInt(this.sdram_buffer_write[i],16))
+            sdram_buffer_write_int[i]=parseInt(this.sdram_buffer_write[i], 16);
           }
-          try {
-              var response = await fetch(addr_serv + "/send_data", {
-                method: "POST",
-                body: addr_hex_to_set_buffer + data_to_send
-              });
-            } catch {
-              this.error = true;
-              return;
+
+          if (!await send_64_words_32bits_to_sdram_buffer(sdram_buffer_write_int)) {
+            this.error = true;
+            return;
           }
-          var code = response.status;
-          if (code != 200) {
-              this.error = true;
-              return;
-          }
-          var op_write=1;
-          var data_len=this.sdram_buffer_write.length;
-          var addr_sdram=parseInt(this.sdram_addr_to_write_buffer,16);
-          var data_to_send = toHex32( (addr_sdram<<9)+(data_len<<2) +op_write);
-          addr_hex_to_set_buffer=toHex32((1<<22)+(1<<21));
-          try {
-              var response = await fetch(addr_serv + "/send_data", {
-                method: "POST",
-                body: addr_hex_to_set_buffer + data_to_send
-              });
-            } catch {
-              this.error = true;
-              return;
+          if (!await send_buffer_to_sdram(this.sdram_buffer_write.length, addr_sdram)) {
+            this.error = true;
+            return;
           }
         },
         async getSDRAM() {
-   
-          var op_read=0;
-          var data_len=this.sdram_buffer_write.length;
-          var addr_sdram=parseInt(this.sdram_addr_to_read,16);
-          var data_to_send = toHex32( (addr_sdram<<9)+(data_len<<2) +op_read);
-          addr_hex_to_set_buffer=toHex32((1<<22)+(1<<21));
+
+          var op_read = 0;
+          var data_len = this.sdram_buffer_write.length;
+          var addr_sdram = parseInt(this.sdram_addr_to_read, 16);
+          var data_to_send = toHex32((addr_sdram << 9) + (data_len << 2) + op_read);
+          addr_hex_to_set_buffer = toHex32((1 << 22) + (1 << 21));
           try {
-              var response = await fetch(addr_serv + "/send_data", {
-                method: "POST",
-                body: addr_hex_to_set_buffer + data_to_send
-              });
-            } catch {
-              this.error = true;
-              return;
+            var response = await fetch(addr_serv + "/send_data", {
+              method: "POST",
+              body: addr_hex_to_set_buffer + data_to_send
+            });
+          } catch {
+            this.error = true;
+            return;
           }
         },
         async sendFile() {
@@ -306,7 +326,7 @@
           var total_recv = 0;
           this.memory = [];
           var initial_addr = this.addr_of_the_memory_to_watch;
-          this.last_memory_addr_that_user_sent_to_get_memory=parseInt(this.addr_of_the_memory_to_watch,16);
+          this.last_memory_addr_that_user_sent_to_get_memory = parseInt(this.addr_of_the_memory_to_watch, 16);
           while (true) {
             var total_to_req = 0;
             if ((this.amount_to_read - total_recv) > 64) total_to_req = 64;
@@ -322,10 +342,51 @@
             );
             for (let i = 0; i < hex.length; i++)
               this.memory.push(hex[i]);
-            initial_addr = (parseInt(initial_addr,16) + 64).toString(16).toUpperCase();
+            initial_addr = (parseInt(initial_addr, 16) + 64).toString(16).toUpperCase();
             if (total_recv == this.amount_to_read) break;
           }
           this.format_memory(0);
+        },
+        async loadIMG(e) {
+          const file = e.target.files[0];
+          if (!file) return;
+
+          const img = new Image();
+          img.src = URL.createObjectURL(file);
+
+          await img.decode();
+          const canvas = document.getElementById("myCanvas");
+          const ctx = canvas.getContext("2d");
+          canvas.width = 640;
+          canvas.height = 360;
+          ctx.drawImage(img, 0, 0, 640, 360);
+
+          const imageData = ctx.getImageData(0, 0, 640, 360);
+          const pixels = imageData.data;
+          const framebuffer = new Uint32Array(230400); //(640*360)
+
+          for (let i = 0; i < pixels.length; i += 4) {
+            framebuffer[Math.floor(i / 4)] = (pixels[i] << 16) | (pixels[i+1] << 8) | (pixels[i+2]);
+          }
+          this.img_to_send = framebuffer;
+        },
+        async sendIMG() {
+          this.img_total_words=this.img_to_send.length
+          for (let i = 0; i < this.img_to_send.length; i = i + 64) {
+
+            var data_to_send=this.img_to_send.slice(i, i + 64)
+            if (!await send_64_words_32bits_to_sdram_buffer(data_to_send)) {
+              this.error = true;
+              console.log("error");
+              return;
+            }
+            if (!await send_buffer_to_sdram(data_to_send.length, i)) {
+              this.error = true;
+              console.log("error");
+              return;
+            }
+            this.img_words_sent=this.img_words_sent+64;
+          }
         }
       }
     }

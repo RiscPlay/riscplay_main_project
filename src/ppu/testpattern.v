@@ -1,22 +1,3 @@
-// ---------------------------------------------------------------------
-// File name         : testpattern.v
-// Module name       : testpattern
-// Created by        : Caojie
-// Module Description: 
-//						I_mode[2:0] = "000" : color bar     
-//						I_mode[2:0] = "001" : net grid     
-//						I_mode[2:0] = "010" : gray         
-//						I_mode[2:0] = "011" : single green
-//                      I_mode[2:0] = "100" : single blue
-//                      I_mode[2:0] = "101" : single red
-//                
-// ---------------------------------------------------------------------
-// Release history
-// VERSION |   Date      | AUTHOR  |    DESCRIPTION
-// --------------------------------------------------------------------
-//   1.0   | 24-Sep-2009 | Caojie  |    initial
-// --------------------------------------------------------------------
-
 module TestPattern
 (
 	input              I_pxl_clk   ,//pixel clock
@@ -38,24 +19,19 @@ module TestPattern
     output             O_de        ,   
     output reg         O_hs        ,
     output reg         O_vs        ,
-    output     [7:0]   O_data_r    ,    
-    output     [7:0]   O_data_g    ,
-    output     [7:0]   O_data_b    
+    output      [7:0]  O_data_r    ,    
+    output      [7:0]  O_data_g    ,
+    output      [7:0]  O_data_b    ,
+	output reg  [21:0] addr_sdram_manager__hdmi_controller,
+    output reg  [31:0] din_sdram_manager__hdmi_controller,
+    input  wire [31:0] dout_sdram_manager__hdmi_controller,
+    output reg         wre_sdram_manager__hdmi_controller,
+    input  wire        processing_request_from__hdmi_controller,
+	input  wire        rst_n_paint,
+	output reg  [31:0] debug_signal_draw
 ); 
 
-//====================================================
-localparam N = 5; //delay N clocks
-
-localparam	WHITE	= {8'd255 , 8'd255 , 8'd255 };//{B,G,R}
-localparam	YELLOW	= {8'd0   , 8'd255 , 8'd255 };
-localparam	CYAN	= {8'd255 , 8'd255 , 8'd0   };
-localparam	GREEN	= {8'd0   , 8'd255 , 8'd0   };
-localparam	MAGENTA	= {8'd255 , 8'd0   , 8'd255 };
-localparam	RED		= {8'd0   , 8'd0   , 8'd255 };
-localparam	BLUE	= {8'd255 , 8'd0   , 8'd0   };
-localparam	BLACK	= {8'd0   , 8'd0   , 8'd0   };
-  
-//====================================================
+localparam N = 5;
 reg  [11:0]   V_cnt     ;
 reg  [11:0]   H_cnt     ;
               
@@ -77,30 +53,6 @@ reg  [11:0]   De_hcnt     ;
 reg  [11:0]   De_hcnt_d1  ;
 reg  [11:0]   De_hcnt_d2  ;
 
-//-------------------------
-//Color bar 
-reg  [11:0]   Color_trig_num; 
-reg           Color_trig    ;
-reg  [3:0]    Color_cnt     ;
-reg  [23:0]   Color_bar     ;
-
-//----------------------------
-//Net grid 
-reg           Net_h_trig;
-reg           Net_v_trig;
-wire [1:0]    Net_pos   ;
-reg  [23:0]   Net_grid  ;
-
-//----------------------------
-//Gray  
-reg  [23:0]   Gray;
-reg  [23:0]   Gray_d1;
-
-//-----------------------------
-wire [23:0]   Single_color;
-
-//-------------------------------
-wire [23:0]   Data_sel;
 
 //-------------------------------
 reg  [23:0]   Data_tmp/*synthesis syn_keep=1*/;
@@ -202,155 +154,289 @@ begin
 		De_vcnt <= De_vcnt;
 end
 
-//---------------------------------------------------
-//Color bar
-//---------------------------------------------------
-always @(posedge I_pxl_clk or negedge I_rst_n)
-begin
-	if(!I_rst_n)
-		Color_trig_num <= 12'd0;
-	else if (Pout_de_dn[1] == 1'b0)
-		Color_trig_num <= I_h_res[11:3]; 
-	else if ((Color_trig == 1'b1) && (Pout_de_dn[1] == 1'b1))
-		Color_trig_num <= Color_trig_num + I_h_res[11:3];
-	else
-		Color_trig_num <= Color_trig_num;
+
+
+
+
+
+
+
+wire [31:0] dout_buffer;
+reg         wre_buffer;
+reg  [10:0] ad_buffer_write;
+reg  [10:0] ad_buffer_read;
+reg  [31:0] din_buffer;
+
+Gowin_DPB__LINE_BUFFER buffer (
+    .ada(ad_buffer_read),
+    .adb(ad_buffer_write),
+	.dina(32'h0),
+	.dinb(din_buffer),
+	.wrea(1'b0),
+    .wreb(wre_buffer),
+	.douta(dout_buffer),
+
+    .ocea(1'b1),
+    .cea(1'b1),
+    .reseta(1'b0),
+    .oceb(1'b1),
+    .ceb(1'b1),
+    .resetb(1'b0),
+    .clka(I_pxl_clk),
+    .clkb(I_pxl_clk)
+);
+
+
+
+
+reg  [20:0] pointer_to_get_next_64_32bits_words;
+wire [20:0] addr_to_first_line_of_fb_in_sdram=21'h0;
+reg  [11:0] n_line_being_obtained;
+reg  [11:0] n_32bits_word_being_obtained_from_the_line;
+wire [6:0] n_32bits_word_to_get_in_every_sdram_request=7'b1000000;
+reg  [21:0] pointer_to_read_sdram_buffer;
+
+reg  [3:0] st_rd_img_lines;
+reg  [3:0] st_rd_img_lines___prev;
+reg  [7:0] time_that___st_rd_img_lines___hold;
+wire sync__st_rd_img_lines=st_rd_img_lines==st_rd_img_lines___prev;
+
+always @(posedge I_pxl_clk) begin
+    if(!rst_n_paint) begin 
+        time_that___st_rd_img_lines___hold<=8'h00;
+        st_rd_img_lines___prev<=ST_RD_IMG_LINES___IDLE;
+    end
+    else begin
+        if(sync__st_rd_img_lines) begin
+            if(time_that___st_rd_img_lines___hold<8'hff) begin
+                time_that___st_rd_img_lines___hold<=time_that___st_rd_img_lines___hold+8'h01;
+            end
+        end
+        else begin
+            time_that___st_rd_img_lines___hold<=8'h00;
+        end
+        st_rd_img_lines___prev<=st_rd_img_lines;
+    end
 end
 
-always @(posedge I_pxl_clk or negedge I_rst_n)
-begin
-	if(!I_rst_n)
-		Color_trig <= 1'b0;
-	else if (De_hcnt == (Color_trig_num-1'b1)) 
-		Color_trig <= 1'b1;
-	else
-		Color_trig <= 1'b0;
+
+localparam [3:0] ST_RD_IMG_LINES___IDLE                         =  4'h0;
+localparam [3:0] ST_RD_IMG_LINES___WAIT_RAM_READ                =  4'h2;
+localparam [3:0] ST_RD_IMG_LINES___READ_RAM_BUFFER              =  4'h3;
+localparam [3:0] ST_RD_IMG_LINES___INC_BUFFER_POINT_TO_WR       =  4'h4;
+
+reg get_buffer;
+reg res___get_buffer;
+reg get_buffer_op_accept;
+reg [10:0] begin_write_buffer;
+reg [10:0] begin_write_buffer_latch;
+reg [10:0] end_write_buffer_latch;
+reg first_ite;
+always @(posedge I_pxl_clk ) begin
+    if(!rst_n_paint) begin
+        pointer_to_get_next_64_32bits_words         <= 21'd640;
+        n_line_being_obtained                       <= 12'd1;
+        addr_sdram_manager__hdmi_controller         <= 22'b1000000000000000000000;
+        n_32bits_word_being_obtained_from_the_line <= 12'h000;
+        din_sdram_manager__hdmi_controller          <= {2'b00,addr_to_first_line_of_fb_in_sdram,n_32bits_word_to_get_in_every_sdram_request,2'b00};
+        st_rd_img_lines                             <= ST_RD_IMG_LINES___IDLE;
+        pointer_to_read_sdram_buffer                <= 22'b0;
+
+        wre_sdram_manager__hdmi_controller          <= 1'b0;
+        wre_buffer                                  <= 1'b0;
+        ad_buffer_write                             <= 11'b0;
+        debug_signal_draw                           <= 32'h00000000;
+        get_buffer_op_accept                        <= 1'b0;
+        res___get_buffer                            <= 1'b0;
+        begin_write_buffer_latch                    <= 11'b0;
+        end_write_buffer_latch                      <= 11'd639;
+        first_ite<=1'b1;
+    end
+    else begin
+        if(get_buffer) begin
+            get_buffer_op_accept <= 1'b1;
+            res___get_buffer     <= 1'b1;
+        end
+        else begin
+            res___get_buffer     <= 1'b0;
+        end
+
+        case(st_rd_img_lines)
+            default: st_rd_img_lines <= ST_RD_IMG_LINES___IDLE;
+            
+            ST_RD_IMG_LINES___IDLE: begin
+                if(n_line_being_obtained == 12'h000) 
+                    pointer_to_get_next_64_32bits_words <= addr_to_first_line_of_fb_in_sdram;
+
+                if(get_buffer_op_accept || n_32bits_word_being_obtained_from_the_line > 12'h000 || first_ite) begin
+                    if(get_buffer_op_accept) begin
+                        begin_write_buffer_latch <= begin_write_buffer;
+                        if(begin_write_buffer == 11'd640) begin
+                            end_write_buffer_latch <= 11'd1279;
+                        end
+                        else begin
+                            end_write_buffer_latch <= 11'd639;
+                        end
+                        
+                        ad_buffer_write <= begin_write_buffer;
+                    end
+                    first_ite<=1'b0;
+                    get_buffer_op_accept               <= 1'b0;
+                    st_rd_img_lines                    <= ST_RD_IMG_LINES___WAIT_RAM_READ;
+                    addr_sdram_manager__hdmi_controller<= 22'b1000000000000000000000;
+                    wre_sdram_manager__hdmi_controller <= 1'b1;
+                    
+                    if(n_line_being_obtained == 12'h000) begin
+                        din_sdram_manager__hdmi_controller <= {2'b00, addr_to_first_line_of_fb_in_sdram, n_32bits_word_to_get_in_every_sdram_request, 2'b00};
+                    end
+                    else begin
+                        din_sdram_manager__hdmi_controller <= {2'b00, pointer_to_get_next_64_32bits_words, n_32bits_word_to_get_in_every_sdram_request, 2'b00};
+                    end
+                end
+                wre_buffer <= 1'b0;
+            end
+
+            ST_RD_IMG_LINES___WAIT_RAM_READ: begin
+                if(sync__st_rd_img_lines) begin
+                    wre_sdram_manager__hdmi_controller <= 1'b0;
+                end
+
+                if(sync__st_rd_img_lines && time_that___st_rd_img_lines___hold > 8'h16) begin
+                    if(processing_request_from__hdmi_controller == 1'b0) begin
+                        st_rd_img_lines                     <= ST_RD_IMG_LINES___READ_RAM_BUFFER;
+                        addr_sdram_manager__hdmi_controller <= 22'b0;
+                    end
+                end
+                wre_buffer <= 1'b0;
+            end
+
+            // Estado onde o dado vindo da SDRAM é de fato capturado
+            ST_RD_IMG_LINES___READ_RAM_BUFFER: begin
+                pointer_to_get_next_64_32bits_words <= pointer_to_get_next_64_32bits_words + 21'b1;
+                st_rd_img_lines                     <= ST_RD_IMG_LINES___INC_BUFFER_POINT_TO_WR;
+                wre_buffer                          <= 1'b1; // Habilita a escrita na BRAM
+                din_buffer                          <= dout_sdram_manager__hdmi_controller;
+                debug_signal_draw                   <= dout_sdram_manager__hdmi_controller;
+            end
+
+            ST_RD_IMG_LINES___INC_BUFFER_POINT_TO_WR: begin
+                wre_buffer                          <= 1'b0; // Força a descida IMEDIATA para não duplicar escrita
+                addr_sdram_manager__hdmi_controller <= addr_sdram_manager__hdmi_controller + 22'b1;
+
+                // 1. Atualiza com precisão o ponteiro de escrita da BRAM
+                if(ad_buffer_write == end_write_buffer_latch) begin
+                    ad_buffer_write <= begin_write_buffer_latch;
+                end
+                else begin
+                    ad_buffer_write <= ad_buffer_write + 11'h001;
+                end
+
+                // 2. Avalia o encerramento baseado no contador de palavras da linha atual
+                if (n_32bits_word_being_obtained_from_the_line == 12'd639) begin
+                    n_32bits_word_being_obtained_from_the_line <= 12'h000;
+                    st_rd_img_lines <= ST_RD_IMG_LINES___IDLE;
+                    
+                    if(n_line_being_obtained == 12'd359)
+                        n_line_being_obtained <= 12'h000;
+                    else 
+                        n_line_being_obtained <= n_line_being_obtained + 12'h001;
+                end
+                else begin
+                    n_32bits_word_being_obtained_from_the_line <= n_32bits_word_being_obtained_from_the_line + 12'h001;
+                    
+                    // Se terminamos uma rajada de 64 e NÃO é o fim da linha (múltiplos de 64: 63, 127, 191...)
+                    if (n_32bits_word_being_obtained_from_the_line[5:0] == 6'b111111) begin
+                        addr_sdram_manager__hdmi_controller <= 22'b1000000000000000000000;
+                        din_sdram_manager__hdmi_controller  <= {
+                            2'b00,
+                            pointer_to_get_next_64_32bits_words,
+                            n_32bits_word_to_get_in_every_sdram_request,
+                            2'b00
+                        };
+                        wre_sdram_manager__hdmi_controller <= 1'b1;
+                        st_rd_img_lines                     <= ST_RD_IMG_LINES___WAIT_RAM_READ;
+                    end
+                    else begin               
+                        st_rd_img_lines <= ST_RD_IMG_LINES___READ_RAM_BUFFER;
+                    end
+                end
+            end
+        endcase
+    end
 end
 
-always @(posedge I_pxl_clk or negedge I_rst_n)
+reg [11:0] V_cnt_prev;
+reg [31:0] count_debug;
+reg [3:0]  count_debug_2;
+reg [11:0] count_rows;
+reg [3:0] line;
+always @(posedge I_pxl_clk)
 begin
-	if(!I_rst_n)
-		Color_cnt <= 3'd0;
-	else if (Pout_de_dn[1] == 1'b0)
-		Color_cnt <= 3'd0;
-	else if ((Color_trig == 1'b1) && (Pout_de_dn[1] == 1'b1))
-		Color_cnt <= Color_cnt + 1'b1;
-	else
-		Color_cnt <= Color_cnt;
-end
-
-always @(posedge I_pxl_clk or negedge I_rst_n)
-begin
-	if(!I_rst_n)
-		Color_bar <= 24'd0;
-	else if(Pout_de_dn[2] == 1'b1)
-		case(Color_cnt)
-			3'd0	:	Color_bar	<=	WHITE  ;
-			3'd1	:	Color_bar	<=	YELLOW ;
-			3'd2	:	Color_bar	<=	CYAN   ;
-			3'd3	:	Color_bar	<=	GREEN  ;
-			3'd4	:	Color_bar	<=	MAGENTA;
-			3'd5	:	Color_bar	<=	RED    ;
-			3'd6	:	Color_bar	<=	BLUE   ;
-			3'd7	:	Color_bar	<=	BLACK  ;
-			default	:	Color_bar	<=	BLACK  ;
-		endcase
-	else
-		Color_bar	<=	BLACK  ;
-end
-
-//---------------------------------------------------
-//Net grid
-//---------------------------------------------------
-always @(posedge I_pxl_clk or negedge I_rst_n)
-begin
-	if(!I_rst_n)
-		Net_h_trig <= 1'b0;
-	else if (((De_hcnt[4:0] == 5'd0) || (De_hcnt == (I_h_res-1'b1))) && (Pout_de_dn[1] == 1'b1))
-		Net_h_trig <= 1'b1;
-	else
-		Net_h_trig <= 1'b0;
-end
-
-always @(posedge I_pxl_clk or negedge I_rst_n)
-begin
-	if(!I_rst_n)
-		Net_v_trig <= 1'b0;
-	else if (((De_vcnt[4:0] == 5'd0) || (De_vcnt == (I_v_res-1'b1))) && (Pout_de_dn[1] == 1'b1))
-		Net_v_trig <= 1'b1;
-	else
-		Net_v_trig <= 1'b0;
-end
-
-assign Net_pos = {Net_v_trig,Net_h_trig};
-
-always @(posedge I_pxl_clk or negedge I_rst_n)
-begin
-	if(!I_rst_n)
-		Net_grid <= 24'd0;
-	else if(Pout_de_dn[2] == 1'b1)
-		case(Net_pos)
-			2'b00	:	Net_grid	<=	BLACK  ;
-			2'b01	:	Net_grid	<=	RED    ;
-			2'b10	:	Net_grid	<=	RED    ;
-			2'b11	:	Net_grid	<=	RED    ;
-			default	:	Net_grid	<=	BLACK  ;
-		endcase
-	else
-		Net_grid	<=	BLACK  ;
-end
-
-//---------------------------------------------------
-//Gray
-//---------------------------------------------------
-always @(posedge I_pxl_clk or negedge I_rst_n)
-begin
-	if(!I_rst_n)
-		Gray <= 24'd0;
-	else
-		Gray <= {De_hcnt[7:0],De_hcnt[7:0],De_hcnt[7:0]};
-end
-
-always @(posedge I_pxl_clk or negedge I_rst_n)
-begin
-	if(!I_rst_n)
-		Gray_d1 <= 24'd0;
-	else
-		Gray_d1 <= Gray;
-end
-
-localparam SQUARE_SIZE = 12'd300; // tamanho do quadrado 300x300 pixels
-localparam SQUARE_X0   = 12'd490; // posição horizontal inicial (centralizado em 1280:  (1280-300)/2 = 490)
-localparam SQUARE_Y0   = 12'd210; // posição vertical inicial (centralizado em 720:   (720-300)/2 = 210)
-
-//---------------------------------------------------
-//Single color
-//---------------------------------------------------
-assign Single_color = {I_single_b,I_single_g,I_single_r};
-
-//============================================================
-assign Data_sel = (I_mode[2:0] == 3'b000) ? Color_bar		: 
-                  (I_mode[2:0] == 3'b001) ? Net_grid 		: 
-                  (I_mode[2:0] == 3'b010) ? Gray_d1    		: 
-				  (I_mode[2:0] == 3'b011) ? {4{BLUE}}       :
-                  (I_mode[2:0] == 3'b100) ? {4{GREEN}}   	: 
-                  (I_mode[2:0] == 3'b101) ? {4{RED}}  	    : 
-                  (I_mode[2:0] == 3'b110) ? ((De_hcnt >= SQUARE_X0 && De_hcnt < (SQUARE_X0 + SQUARE_SIZE) &&
-                                              De_vcnt >= SQUARE_Y0 && De_vcnt < (SQUARE_Y0 + SQUARE_SIZE)) ? BLUE : RED) :
-                                            {4{BLACK}} 	    ;
-
-//---------------------------------------------------
-always @(posedge I_pxl_clk or negedge I_rst_n)
-begin
-	if(!I_rst_n) 
+	
+	if(!rst_n_paint) begin
+		
 		Data_tmp <= 24'd0;
-	else
-		Data_tmp <= Data_sel;
-end
+		V_cnt_prev<=12'h000;
+		De_hcnt_d1<=12'h000;
+		De_hcnt_d2<=12'h000;
+		count_debug<=32'h00000000;
+		count_debug_2<=4'h0;
+		count_rows<=12'd0;
+		ad_buffer_read<=11'd640;
+		begin_write_buffer<=11'd0;
+		line<=4'h0;
+		get_buffer<=1'b0;
+	end
+	else begin
+		De_hcnt_d1<=De_hcnt;
+		De_hcnt_d2<=De_hcnt_d1;
+		V_cnt_prev<=V_cnt;
+		if(De_neg) begin
+			if(line==4'h3)
+				line<=4'h0;
+			else 
+				line<=line+4'h1;
+			if(line==4'h1) begin
+				get_buffer<=1'b1;
+				begin_write_buffer<=11'd640;
+			end
+			else if(line==4'h3) begin
+				begin_write_buffer<=11'd0;
+				get_buffer<=1'b1;
+			end
+		end
+		else begin
+			if(res___get_buffer) begin
+				get_buffer<=1'b0;
+			end
+		end
+		
+		if(Pout_de_dn[2]==1'b0) begin
+			count_rows<=12'h000;
+			Data_tmp <= 24'h000000;
+			if(line==4'h0 || line==4'h1) begin
+				ad_buffer_read<=11'd640;
+			end
+			else begin
+				ad_buffer_read<=11'd0;
+			end
+		end
+		else  begin
+			count_rows<=count_rows+12'h001;
+			if(count_rows[0]==1'b1) begin
+				ad_buffer_read<=ad_buffer_read+11'b1;
+			end
+			else begin
+			//debug_signal_draw<={douta___line_buffer__read__blue,douta___line_buffer__read__green,douta___line_buffer__read__red};
 
-assign O_data_r = Data_tmp[ 7: 0];
+                    Data_tmp<=dout_buffer[23:0];
+            end
+		end
+	end
+end
+assign O_data_r = Data_tmp[23:16] ;
 assign O_data_g = Data_tmp[15: 8];
-assign O_data_b = Data_tmp[23:16];
+assign O_data_b = Data_tmp[ 7: 0];
 
 endmodule       
               

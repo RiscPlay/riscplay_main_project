@@ -24,7 +24,9 @@ module mapper(
     input  wire [31:0] addr_mapper,
     input  wire [31:0] din_mapper,
     output wire [31:0] dout_mapper,
-    input  wire        wre_mapper
+    input  wire        wre_mapper,
+
+    input wire [31:0] debug_signal_draw
 );
 
 //
@@ -34,6 +36,8 @@ wire sel_main    = addr_mapper[29];
 wire sel_sdram   = ~sel_main && addr_mapper[22];
 wire sel_control = ~sel_main && ~sel_sdram && addr_mapper[8];
 wire sel_led     = ~sel_main && ~sel_sdram && ~sel_control && addr_mapper[6];
+wire sel_draw    = ~sel_main && ~sel_sdram && ~sel_control  &&  ~sel_led && addr_mapper[1];
+
 
 //
 // MAIN MEMORY
@@ -69,6 +73,7 @@ assign dout_mapper =
     sel_control ? dout_control_cpu_memory :
     sel_led     ? dout_led_memory :
     sel_sdram   ? dout_sdram_manager :
+    sel_draw    ? debug_signal_draw :
     32'h00000000;
 
 
