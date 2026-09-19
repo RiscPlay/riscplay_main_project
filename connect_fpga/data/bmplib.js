@@ -4,7 +4,7 @@ async function parseBMP(file) {
 
     // Assinatura BMP
     if (view.getUint16(0, false) !== 0x424D) {
-        throw new Error("Não é um arquivo BMP");
+        throw new Error("Incorect Format");
     }
 
     const pixelOffset = view.getUint32(10, true);
@@ -20,7 +20,7 @@ async function parseBMP(file) {
     const compression = view.getUint32(30, true);
 
     if (compression !== 0) {
-        throw new Error("Somente BI_RGB sem compressão é suportado");
+        throw new Error("Just BI_RGB without compression is allowed");
     }
 
     // Quantidade de cores da paleta
@@ -82,8 +82,8 @@ async function parseBMP(file) {
 
                 pixels[y][x] =
                     (x & 1)
-                    ? (byte & 0x0F)
-                    : ((byte >> 4) & 0x0F);
+                        ? (byte & 0x0F)
+                        : ((byte >> 4) & 0x0F);
             }
 
         } else if (bpp === 1) {
@@ -99,7 +99,7 @@ async function parseBMP(file) {
 
         } else {
             throw new Error(
-                `BPP ${bpp} não suportado`
+                `BPP ${bpp} don't supported`
             );
         }
     }

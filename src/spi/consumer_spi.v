@@ -31,7 +31,8 @@ module consumer_spi
     input  wire        ready_for_recv_data,
     output reg  [63:0] op_args,
 
-    output reg [3:0] sel___main_memory
+    output reg [3:0] sel___main_memory,
+    output reg       spi_comm_started
 );
 
 
@@ -116,6 +117,7 @@ always @(posedge clk) begin
         awake_module<='0;
         sending_crc_resulted_from_module_op<=1'b0;
         sel___main_memory<=4'b0000;
+        spi_comm_started<=1'b0;
     end
     else begin
         cs_prev<=cs;
@@ -134,6 +136,7 @@ always @(posedge clk) begin
         case(state)
             default: state<=STATE__RESET;
             STATE__RESET: begin
+                spi_comm_started<=1'b0;
                 if(~busy_from_read_fifo & ~busy_from_write_fifo & crc_done) begin
                     op<=8'h00;
                     op_defined<=1'b0;
@@ -151,6 +154,7 @@ always @(posedge clk) begin
             end
             STATE__IDLE:
             begin
+                spi_comm_started<=1'b1;
                 if(~empty_fifo & ~busy_from_read_fifo) begin
                     read_fifo<=1'b1;
                     if(n_bytes_recv_from_fifo_to_define_of_op_args<4'h8) begin

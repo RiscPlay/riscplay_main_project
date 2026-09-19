@@ -1,0 +1,14 @@
+    <div class="col-12 col-sm-12 col-md-6 col-lg-4">
+        <div class="input-group mb-3" style="max-width: 25em;">
+            <span class="input-group-text" id="add-on-1" x-text="label"></span>
+
+            <input type="text" x-model="input_value" class="form-control" placeholder="000000"
+                aria-label="Username" aria-describedby="add-on-1"
+                @input="validate" :readonly="block_input_value">
+                
+        </div>
+    </div>
+    <div class="col-5 col-lg-2">
+        <button  @click="action(input_value)" class="btn btn-secondary"><span x-text="buttonText"></span></button>
+    </div>
+

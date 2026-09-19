@@ -237,4 +237,21 @@ bool shutdown_or_up_processor_v2(bool enable){
   body[3]=(uint8_t)enable;
   return send_uint8_vector_to_fpga(UINT32_C(0x100),body,4);
 }
+
+bool enable_or_disable_manual_clk(bool enable){
+  uint8_t body[4];
+  body[0]=0;
+  body[1]=0;
+  body[2]=0;
+  body[3]=(uint8_t)enable;
+  return send_uint8_vector_to_fpga(UINT32_C(0x101),body,4);
+}
+bool set_manual_clk(bool value){
+  uint8_t body[4];
+  body[0]=0;
+  body[1]=0;
+  body[2]=0;
+  body[3]=(uint8_t)value;
+  return send_uint8_vector_to_fpga(UINT32_C(0x102),body,4);
+}
 #endif

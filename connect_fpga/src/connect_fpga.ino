@@ -40,6 +40,11 @@ void create_server()
   server.on("/stop_processor", HTTP_GET, handleStopProcessor);
   server.on("/enable_processor", HTTP_GET, handleEnableProcessor);
   server.on("/recv_data", HTTP_GET, handleRecvData);
+  server.on("/enable_manual_clk", HTTP_GET, handleEnableManualClk);
+  server.on("/disable_manual_clk", HTTP_GET, handleDisableManualClk);
+  server.on("/set_manual_clk_on", HTTP_GET, handleSetManualClkOn);
+  server.on("/set_manual_clk_off", HTTP_GET, handleSetManualClkOff);
+
   server.serveStatic("/", SPIFFS, "/");
 
   server.onNotFound(handleNotFound);
@@ -85,6 +90,49 @@ void handleEnableProcessor()
 void handleStopProcessor()
 {
   if (shutdown_or_up_processor_v2(false))
+  {
+    server.send(200, "text/plain", "ok");
+  }
+  else
+  {
+    server.send(400, "text/plain", "Nenhuma mensagem recebida");
+  }
+}
+void handleEnableManualClk()
+{
+  if (enable_or_disable_manual_clk(true))
+  {
+    server.send(200, "text/plain", "ok");
+  }
+  else
+  {
+    server.send(400, "text/plain", "Nenhuma mensagem recebida");
+  }
+}
+void handleDisableManualClk()
+{
+  if (enable_or_disable_manual_clk(false))
+  {
+    server.send(200, "text/plain", "ok");
+  }
+  else
+  {
+    server.send(400, "text/plain", "Nenhuma mensagem recebida");
+  }
+}
+void handleSetManualClkOn(){
+  if (set_manual_clk(true))
+  {
+    server.send(200, "text/plain", "ok");
+  }
+  else
+  {
+    server.send(400, "text/plain", "Nenhuma mensagem recebida");
+  }
+}
+
+void handleSetManualClkOff(){
+  if (set_manual_clk(false))
   {
     server.send(200, "text/plain", "ok");
   }

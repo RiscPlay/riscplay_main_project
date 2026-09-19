@@ -11,12 +11,18 @@ module HDMI(
     input  wire [31:0] dout_sdram_manager__hdmi_controller,
     output wire        wre_sdram_manager__hdmi_controller,
     input  wire        processing_request_from__hdmi_controller,
+    input  wire [6:0]  n_32bits_words_processed_by_current_hdmi_request,
     input  wire        pix_clk,  
     input  wire        pll_lock,
     input  wire        serial_clk,
     input  wire        hdmi4_rst_n,
     input  wire        rst_n_paint,
-	output wire [31:0] debug_signal_draw
+    input  wire        set_addr_to_frame_buffer,
+    input  wire [20:0] addr_to_frame_buffer,
+    input  wire [20:0] fb_horizontal_offset__input,
+    output reg         set_addr_to_frame_buffer__ack,
+    output wire        hdmi_ctrl_is_standby
+
 
 );
 wire        I_rst_n;
@@ -94,7 +100,12 @@ TestPattern testpattern_inst
     .dout_sdram_manager__hdmi_controller(dout_sdram_manager__hdmi_controller),
     .wre_sdram_manager__hdmi_controller(wre_sdram_manager__hdmi_controller),
     .processing_request_from__hdmi_controller(processing_request_from__hdmi_controller),
-    .debug_signal_draw(debug_signal_draw)
+    .set_addr_to_frame_buffer__ack(set_addr_to_frame_buffer__ack),
+    .addr_to_frame_buffer(addr_to_frame_buffer),
+    .fb_horizontal_offset__input(fb_horizontal_offset__input),
+    .set_addr_to_frame_buffer(set_addr_to_frame_buffer),
+    .n_32bits_words_processed_by_current_hdmi_request(n_32bits_words_processed_by_current_hdmi_request),
+    .hdmi_ctrl_is_standby(hdmi_ctrl_is_standby)
 );
 
 always@(posedge pix_clk)

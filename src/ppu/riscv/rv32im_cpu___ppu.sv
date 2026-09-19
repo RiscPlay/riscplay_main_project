@@ -8,11 +8,19 @@ module rv32im_cpu___ppu(
     output wire      mem_we___external,
     input wire enable,
 
+    output reg [5:0]   leds,
+    output reg [63:0]  cmd_to_put_in_ppu_fifo,
+    output reg         wr_cmd_for_ppu_fifo,
+    input  wire        processing_the_ppu_fifo_insert,
 
+    output  reg        set_addr_to_frame_buffer,
+    output  reg [20:0] addr_to_frame_buffer,
+    output  reg [20:0] fb_horizontal_offset,
 
+    input   wire       set_addr_to_frame_buffer__ack,
+    input   wire       ppu_cmd_fifo_is_empity,
+    output  reg [31:0] debug_signal
 
-    output  reg    [5:0]   leds,
-    output  reg    [31:0]  pc_out  
   );
   
 
@@ -118,6 +126,7 @@ module rv32im_cpu___ppu(
 
   always @(posedge clk) begin
     if(reset==1'b0) begin
+      if(enable) begin
         if(sync__state) begin
             if(time_that_stage_hold<8'hff) begin
                 time_that_stage_hold<=time_that_stage_hold+8'h01;
@@ -127,6 +136,7 @@ module rv32im_cpu___ppu(
             time_that_stage_hold<=8'h00;
         end
         state_prev<=state;
+      end
     end
     else begin 
       time_that_stage_hold<=8'h00;
@@ -135,9 +145,10 @@ module rv32im_cpu___ppu(
   end
   reg is_doing_div_op;
   reg is_doing_rem_op;
+  reg is_doing_qdiv32;
 
 
-  wire pause_main_FSM_in_WRITEBACK_STAGE =is_doing_div_op|is_doing_rem_op;
+  wire pause_main_FSM_in_WRITEBACK_STAGE =is_doing_div_op|is_doing_rem_op|is_doing_qdiv32;
   reg  signed [31:0] rs2_val_signed;
   reg  signed [31:0] rs1_val_signed;
   reg  signed [32:0] rs2_val_32bits_unsigned_in_a_reg_33bits_signed;
@@ -145,7 +156,7 @@ module rv32im_cpu___ppu(
   wire signed [63:0] product_MUL_AND_MULH = rs1_val_signed * rs2_val_signed;
   wire signed [65:0] product_MULHSU=rs1_val_signed *rs2_val_32bits_unsigned_in_a_reg_33bits_signed;
   wire        [63:0] product_MULHU = rs1_val * rs2_val;
-
+  wire signed [31:0] product_qdiv32 = product_MUL_AND_MULH>>>32;
 
 
 
@@ -165,15 +176,30 @@ module rv32im_cpu___ppu(
     .quotient(quotient),
     .remainder(remainder),
 
-    .busy(busy),
+    .busy(busy_div32),
     .done(done_div32)
 
   );
+  
+  reg           start_qdiv32;
+  wire [31:0]   quotient____qdiv32;
+  wire          busy____qdiv32;
+  wire          done____qdiv32;
+  
+  qdiv32_fsm qdiv32_fsm___inst(
+    .clk(clk),
+    .rst(reset),
+    .start(start_qdiv32),
+    .dividend(rs1_val),
+    .divisor(rs2_val),
+    .quotient(quotient____qdiv32),
+
+    .busy(busy____qdiv32),
+    .done(done____qdiv32)
+  );
 
   always @(posedge clk) begin
-    //pc_out<=pc;
     if(reset) begin
-      leds<=6'b000000;
       pc <= 32'h80000000;
       state <= FETCH;
       branch_taken<=1'b0;
@@ -185,16 +211,20 @@ module rv32im_cpu___ppu(
       leds<=6'b111111;
       is_doing_div_op<=1'b0;
       is_doing_rem_op<=1'b0;
+      start_qdiv32<=1'b0;
+      is_doing_qdiv32<=1'b0;
+      wr_cmd_for_ppu_fifo<=1'b0;
       for (i = 0; i < 32; i = i + 1) begin
           regfile[i] <= 32'h0;
       end
+      debug_signal<=32'h00000000;
+
     end
 
     else if(enable) begin
       case(state)
 
         FETCH:begin
-          
             mem_addr <= pc;
             regfile[5'b00000]<=32'h00000000;
             mem_we   <= 0;
@@ -325,15 +355,39 @@ module rv32im_cpu___ppu(
               alu_result <= pc + imm_u;
               write_in_register<=1'b1;
               state <= WRITEBACK;
+
               `ifdef SIM
               print_rd<=1'b1;
+              `endif
+            end
+            7'b0001011: begin //custom fixed point instructions
+              `ifndef SIM
+              `include "alu_fixed_point___ppu.vh"
+              `endif
+              `ifdef SIM
+              `include "ppu/riscv/alu_fixed_point___ppu.vh"
+              `endif
+              state <= WRITEBACK;
+              write_in_register<=1'b1;
+              `ifdef SIM
+              print_rs1<=1'b1;
+              print_rs2<=1'b1;
+              print_rd<=1'b1;
+              `endif
+            end
+            7'b0101011: begin //custom ppu instructions
+              `ifndef SIM
+              `include "control_ppu___ppu.vh"
+              `endif
+              `ifdef SIM
+              `include "ppu/riscv/control_ppu___ppu.vh"
               `endif
             end
             7'b0001111: begin // FENCE
               state <= WRITEBACK;
             end
             default: begin
-              state <= WRITEBACK;
+              state <= FETCH;
             end
 
           endcase
@@ -384,9 +438,10 @@ module rv32im_cpu___ppu(
               7'b1101111: begin // JAL
                   pc <=  pc+imm_j;
               end
-              default: pc <= pc + 32'h00000004;
+              default: begin 
+                pc <= pc + 32'h00000004;
+              end
             endcase
-
             state <= FETCH;
             `ifdef SIM
             $fwrite(fp_with_data,"%08h,",pc);
@@ -403,12 +458,21 @@ module rv32im_cpu___ppu(
           end
           else begin
             if(sync__state && time_that_stage_hold>=8'h05) begin
-              start_div32<=1'b0;
-              if(done_div32) begin
-                if(is_doing_div_op) alu_result<=quotient;
-                else if(is_doing_rem_op) alu_result<=remainder;
-                 is_doing_div_op<=1'b0;
-                 is_doing_rem_op<=1'b0;
+              if(is_doing_rem_op || is_doing_div_op) begin
+                start_div32<=1'b0;
+                if(done_div32) begin
+                  if(is_doing_div_op) alu_result<=quotient;
+                  else if(is_doing_rem_op) alu_result<=remainder;
+                  is_doing_div_op<=1'b0;
+                  is_doing_rem_op<=1'b0;
+                end
+              end
+              else if(is_doing_qdiv32) begin
+                start_qdiv32<=1'b0;
+                if(done____qdiv32) begin
+                    is_doing_qdiv32<=1'b0;
+                    alu_result<=quotient____qdiv32;
+                end
               end
             end
           end

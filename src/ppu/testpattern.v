@@ -28,7 +28,12 @@ module TestPattern
     output reg         wre_sdram_manager__hdmi_controller,
     input  wire        processing_request_from__hdmi_controller,
 	input  wire        rst_n_paint,
-	output reg  [31:0] debug_signal_draw
+    input  wire        set_addr_to_frame_buffer,
+    input  wire [20:0] addr_to_frame_buffer,
+    input  wire [20:0] fb_horizontal_offset__input,
+    output reg         set_addr_to_frame_buffer__ack,
+    input  wire [6:0]  n_32bits_words_processed_by_current_hdmi_request,
+    output reg         hdmi_ctrl_is_standby
 ); 
 
 localparam N = 5;
@@ -186,11 +191,44 @@ Gowin_DPB__LINE_BUFFER buffer (
     .clkb(I_pxl_clk)
 );
 
+localparam [3:0] ST_RD_IMG_LINES___IDLE                         =  4'h0;
+localparam [3:0] ST_RD_IMG_LINES___WAIT_RAM_READ                =  4'h2;
+localparam [3:0] ST_RD_IMG_LINES___READ_RAM_BUFFER              =  4'h3;
+localparam [3:0] ST_RD_IMG_LINES___INC_BUFFER_POINT_TO_WR       =  4'h4;
 
-
+reg [20:0] next_addr_to_first_line_of_fb_in_sdram=21'h0;
+reg [20:0] fb_horizontal_offset;
+reg set_addr_to_frame_buffer__prev;
+reg wating_set_framebuffer;
+always @(posedge I_pxl_clk ) begin
+    if(!rst_n_paint) begin 
+        next_addr_to_first_line_of_fb_in_sdram<=21'h0;
+        set_addr_to_frame_buffer__prev<=1'b0;
+        wating_set_framebuffer<=1'b0;
+        fb_horizontal_offset<=21'b0;
+    end
+    else begin
+        set_addr_to_frame_buffer__prev<=set_addr_to_frame_buffer;
+        if(set_addr_to_frame_buffer && !set_addr_to_frame_buffer__prev) begin
+            wating_set_framebuffer<=1'b1;
+        end
+        else if(wating_set_framebuffer) begin
+            if(n_line_being_obtained == 12'd359 && st_rd_img_lines==ST_RD_IMG_LINES___INC_BUFFER_POINT_TO_WR && n_32bits_word_being_obtained_from_the_line == 12'd637) begin
+                //fb_horizontal_offset<=fb_horizontal_offset__input;
+                next_addr_to_first_line_of_fb_in_sdram<=addr_to_frame_buffer;
+                set_addr_to_frame_buffer__ack<=1'b1;
+                wating_set_framebuffer<=1'b0;
+            end
+        end
+        else begin
+            set_addr_to_frame_buffer__ack<=1'b0;
+        end
+    end
+end
 
 reg  [20:0] pointer_to_get_next_64_32bits_words;
-wire [20:0] addr_to_first_line_of_fb_in_sdram=21'h0;
+reg  [20:0] addr_to_first_line_of_fb_in_sdram;
+//wire [20:0] addr_to_first_line_of_fb_in_sdram=21'h0;
 reg  [11:0] n_line_being_obtained;
 reg  [11:0] n_32bits_word_being_obtained_from_the_line;
 wire [6:0] n_32bits_word_to_get_in_every_sdram_request=7'b1000000;
@@ -220,14 +258,12 @@ always @(posedge I_pxl_clk) begin
 end
 
 
-localparam [3:0] ST_RD_IMG_LINES___IDLE                         =  4'h0;
-localparam [3:0] ST_RD_IMG_LINES___WAIT_RAM_READ                =  4'h2;
-localparam [3:0] ST_RD_IMG_LINES___READ_RAM_BUFFER              =  4'h3;
-localparam [3:0] ST_RD_IMG_LINES___INC_BUFFER_POINT_TO_WR       =  4'h4;
+
 
 reg get_buffer;
 reg res___get_buffer;
 reg get_buffer_op_accept;
+reg reset__get_buffer_op_accept;
 reg [10:0] begin_write_buffer;
 reg [10:0] begin_write_buffer_latch;
 reg [10:0] end_write_buffer_latch;
@@ -237,28 +273,34 @@ always @(posedge I_pxl_clk ) begin
         pointer_to_get_next_64_32bits_words         <= 21'd640;
         n_line_being_obtained                       <= 12'd1;
         addr_sdram_manager__hdmi_controller         <= 22'b1000000000000000000000;
-        n_32bits_word_being_obtained_from_the_line <= 12'h000;
-        din_sdram_manager__hdmi_controller          <= {2'b00,addr_to_first_line_of_fb_in_sdram,n_32bits_word_to_get_in_every_sdram_request,2'b00};
+        n_32bits_word_being_obtained_from_the_line  <= 12'h000;
+        addr_to_first_line_of_fb_in_sdram           <= next_addr_to_first_line_of_fb_in_sdram;
+        din_sdram_manager__hdmi_controller          <= {2'b00,next_addr_to_first_line_of_fb_in_sdram,n_32bits_word_to_get_in_every_sdram_request,2'b00};
         st_rd_img_lines                             <= ST_RD_IMG_LINES___IDLE;
         pointer_to_read_sdram_buffer                <= 22'b0;
 
         wre_sdram_manager__hdmi_controller          <= 1'b0;
         wre_buffer                                  <= 1'b0;
         ad_buffer_write                             <= 11'b0;
-        debug_signal_draw                           <= 32'h00000000;
         get_buffer_op_accept                        <= 1'b0;
         res___get_buffer                            <= 1'b0;
         begin_write_buffer_latch                    <= 11'b0;
         end_write_buffer_latch                      <= 11'd639;
         first_ite<=1'b1;
+        reset__get_buffer_op_accept                <=  1'b0;
     end
     else begin
-        if(get_buffer) begin
-            get_buffer_op_accept <= 1'b1;
-            res___get_buffer     <= 1'b1;
+        if(reset__get_buffer_op_accept==1'b0) begin
+            if(get_buffer) begin
+                get_buffer_op_accept <= 1'b1;
+                res___get_buffer     <= 1'b1;
+            end
+            else begin
+                res___get_buffer     <= 1'b0;
+            end
         end
         else begin
-            res___get_buffer     <= 1'b0;
+            get_buffer_op_accept <= 1'b0;
         end
 
         case(st_rd_img_lines)
@@ -266,7 +308,7 @@ always @(posedge I_pxl_clk ) begin
             
             ST_RD_IMG_LINES___IDLE: begin
                 if(n_line_being_obtained == 12'h000) 
-                    pointer_to_get_next_64_32bits_words <= addr_to_first_line_of_fb_in_sdram;
+                    pointer_to_get_next_64_32bits_words <= addr_to_first_line_of_fb_in_sdram+fb_horizontal_offset;
 
                 if(get_buffer_op_accept || n_32bits_word_being_obtained_from_the_line > 12'h000 || first_ite) begin
                     if(get_buffer_op_accept) begin
@@ -279,9 +321,10 @@ always @(posedge I_pxl_clk ) begin
                         end
                         
                         ad_buffer_write <= begin_write_buffer;
+                        reset__get_buffer_op_accept  <= 1'b1;
+
                     end
                     first_ite<=1'b0;
-                    get_buffer_op_accept               <= 1'b0;
                     st_rd_img_lines                    <= ST_RD_IMG_LINES___WAIT_RAM_READ;
                     addr_sdram_manager__hdmi_controller<= 22'b1000000000000000000000;
                     wre_sdram_manager__hdmi_controller <= 1'b1;
@@ -297,11 +340,12 @@ always @(posedge I_pxl_clk ) begin
             end
 
             ST_RD_IMG_LINES___WAIT_RAM_READ: begin
+                reset__get_buffer_op_accept  <= 1'b0;
                 if(sync__st_rd_img_lines) begin
                     wre_sdram_manager__hdmi_controller <= 1'b0;
                 end
 
-                if(sync__st_rd_img_lines && time_that___st_rd_img_lines___hold > 8'h16) begin
+                if(sync__st_rd_img_lines && time_that___st_rd_img_lines___hold > 8'h2) begin
                     if(processing_request_from__hdmi_controller == 1'b0) begin
                         st_rd_img_lines                     <= ST_RD_IMG_LINES___READ_RAM_BUFFER;
                         addr_sdram_manager__hdmi_controller <= 22'b0;
@@ -316,7 +360,6 @@ always @(posedge I_pxl_clk ) begin
                 st_rd_img_lines                     <= ST_RD_IMG_LINES___INC_BUFFER_POINT_TO_WR;
                 wre_buffer                          <= 1'b1; // Habilita a escrita na BRAM
                 din_buffer                          <= dout_sdram_manager__hdmi_controller;
-                debug_signal_draw                   <= dout_sdram_manager__hdmi_controller;
             end
 
             ST_RD_IMG_LINES___INC_BUFFER_POINT_TO_WR: begin
@@ -333,11 +376,14 @@ always @(posedge I_pxl_clk ) begin
 
                 // 2. Avalia o encerramento baseado no contador de palavras da linha atual
                 if (n_32bits_word_being_obtained_from_the_line == 12'd639) begin
+                    pointer_to_get_next_64_32bits_words<=pointer_to_get_next_64_32bits_words+fb_horizontal_offset;
                     n_32bits_word_being_obtained_from_the_line <= 12'h000;
                     st_rd_img_lines <= ST_RD_IMG_LINES___IDLE;
                     
-                    if(n_line_being_obtained == 12'd359)
+                    if(n_line_being_obtained == 12'd359) begin
                         n_line_being_obtained <= 12'h000;
+                        addr_to_first_line_of_fb_in_sdram          <= next_addr_to_first_line_of_fb_in_sdram;
+                    end
                     else 
                         n_line_being_obtained <= n_line_being_obtained + 12'h001;
                 end
@@ -427,9 +473,7 @@ begin
 				ad_buffer_read<=ad_buffer_read+11'b1;
 			end
 			else begin
-			//debug_signal_draw<={douta___line_buffer__read__blue,douta___line_buffer__read__green,douta___line_buffer__read__red};
-
-                    Data_tmp<=dout_buffer[23:0];
+                Data_tmp<=dout_buffer[23:0];
             end
 		end
 	end
@@ -437,6 +481,46 @@ end
 assign O_data_r = Data_tmp[23:16] ;
 assign O_data_g = Data_tmp[15: 8];
 assign O_data_b = Data_tmp[ 7: 0];
+
+
+reg [15:0] n_cycles_since_last_line;
+reg [3:0]  st_fsm_to_count_cycles_since_last_line;
+localparam [3:0] ST_FSM_TO_COUNT_CYCLES____DETECT_END_LINE =  4'h0;
+localparam [3:0] ST_FSM_TO_COUNT_CYCLES____COUNT_CYCLES =  4'h1;
+
+always @(posedge I_pxl_clk) begin
+    case(st_fsm_to_count_cycles_since_last_line)
+        default: st_fsm_to_count_cycles_since_last_line<=ST_FSM_TO_COUNT_CYCLES____DETECT_END_LINE;
+        ST_FSM_TO_COUNT_CYCLES____DETECT_END_LINE: begin
+            if( st_rd_img_lines___prev  ==ST_RD_IMG_LINES___INC_BUFFER_POINT_TO_WR &&
+                st_rd_img_lines         ==ST_RD_IMG_LINES___IDLE) begin
+                st_fsm_to_count_cycles_since_last_line<=ST_FSM_TO_COUNT_CYCLES____COUNT_CYCLES;
+                n_cycles_since_last_line<=16'h0000;
+            end
+            else begin
+                n_cycles_since_last_line<=16'hffff;
+            end
+        end
+        ST_FSM_TO_COUNT_CYCLES____COUNT_CYCLES: begin
+            if(st_rd_img_lines !=ST_RD_IMG_LINES___IDLE) 
+                st_fsm_to_count_cycles_since_last_line<=ST_FSM_TO_COUNT_CYCLES____DETECT_END_LINE;
+            n_cycles_since_last_line<=n_cycles_since_last_line+16'h0001;
+
+        end
+    endcase
+end
+always @(posedge I_pxl_clk) begin
+    if(V_cnt<11'd22 ||  V_cnt >11'd744) begin
+        hdmi_ctrl_is_standby<=1'b1;
+    end
+    else if(n_cycles_since_last_line<16'd1500) begin
+        hdmi_ctrl_is_standby<=1'b1;
+    end
+    else begin
+        hdmi_ctrl_is_standby<=1'b0;
+    end
+end
+
 
 endmodule       
               

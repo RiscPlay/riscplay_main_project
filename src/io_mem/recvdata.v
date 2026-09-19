@@ -26,7 +26,8 @@ module recvdata (
 
     output reg    [31:0] addr_main_memory,
     output reg    [31:0] din_main_memory,
-    output reg           wre_main_memory
+    output reg           wre_main_memory,
+    input  wire          spi_can_access_memory
 
 );
 
@@ -84,7 +85,7 @@ always @(posedge clk) begin
             default: state<=STATE_RECV_DATA;
             STATE_RECV_DATA: begin
                 stopped<=1'b0;
-                if(~busy_from_read_fifo & ~empty_fifo) begin
+                if(~busy_from_read_fifo & ~empty_fifo & spi_can_access_memory) begin
                     rd_req_fifo<=1'b1;
                     if(~crc_started) begin
                         start_crc32<=1'b1;

@@ -1,0 +1,31 @@
+<div class="row py-2" x-data="comp___manual_clk()">
+    <div class="row">
+        <div class="col">
+            <h3>Control CLK</h3>
+        </div>
+    </class>
+    <template x-if="error">
+        <div class="row py-1">
+            <div class="col">
+                <div class="alert alert-danger" role="alert">
+                    <h5 class="alert-heading">Danger</h5>
+                    Control error.
+                </div>
+            </div>
+        </div>
+    </template>
+    <div class="row align-items-center py-1">
+
+        <div class="col-3">
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" x-model="manual_clock" @change="change_clock_type()">
+                <label class="form-check-label" for="example-checkbox-1">Manual clock</label>
+            </div>
+        </div>
+
+        <div class="col-5 col-lg-2">
+            <button  @click="clock_signal()" class="btn btn-secondary"><span> clock signal</span></button>
+        </div>
+    </div>
+
+</div>

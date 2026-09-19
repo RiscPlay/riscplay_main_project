@@ -7,12 +7,16 @@ module sdram_manager(
     input   wire  [21:0]  addr_sdram_manager__pixel_ppu,
     input   wire  [31:0]  din_sdram_manager__pixel_ppu,
     output  reg   [31:0]  dout_sdram_manager__pixel_ppu,
+    input   wire  [21:0]  addr_sdram_manager__pixel_cpu,
+    input   wire  [31:0]  din_sdram_manager__pixel_cpu,
+    output  wire  [31:0]  dout_sdram_manager__pixel_cpu,
     input   wire  [21:0]  addr_sdram_manager__hdmi_controller,
     input   wire  [31:0]  din_sdram_manager__hdmi_controller,
-    output  reg   [31:0]  dout_sdram_manager__hdmi_controller,
+    output  wire  [31:0]  dout_sdram_manager__hdmi_controller,
     input   wire          wre_sdram_manager__mapper,
     input   wire          wre_sdram_manager__hdmi_controller,
     input   wire          wre_sdram_manager__pixel_ppu,
+    input   wire          wre_sdram_manager__pixel_cpu,
 
 
     input  wire        O_sdrc_init_done,
@@ -30,12 +34,22 @@ module sdram_manager(
     output reg  [7:0]  I_sdrc_data_len,
     output wire        busy,
     output wire        processing_request_from__pixel_ppu,
+    output wire        processing_request_from__pixel_cpu,
     output wire        processing_request_from__hdmi_controller,
-    output wire        processing_request_from__mapper
+    output wire        processing_request_from__mapper,
+    output reg [6:0]  n_32bits_words_processed_by_current_pixel_ppu_request,
+    output wire [6:0]  n_32bits_words_processed_by_current_hdmi_request,
+    input  wire        hdmi_ctrl_is_standby,
+    input  wire        cpu_reseted,
+    input  wire        cpu_enabled,
+    output reg [31:0]  debug_signal,
+    output reg [63:0]  count_pulses_where_sdram_controller_is_idle
+
 );
 wire mapper_in_control;
 wire hdmi_controller_in_control;
 wire pixel_ppu_in_control;
+wire pixel_cpu_in_control;
 
 
 
@@ -71,6 +85,8 @@ localparam CMD_NOP       = 3'b111;
 wire wre_pulse;
 wire wre_pulse_from_mapper;
 wire wre_pulse_from_pixel_ppu;
+wire wre_pulse_from_pixel_cpu;
+
 wire wre_pulse_from_hdmi_controller;
 wire req__op_in_sdram;
 wire req__op_in_sdram_from_define_signals;
@@ -80,14 +96,8 @@ wire [31:0] addr_sdram_manager_to_process;
 wire [31:0] din_sdram_manager_to_process;
 
 
-reg  [31:0]  din_sdram_manager__mapper__buffer;
-reg  [31:0]  addr_sdram_manager__mapper__buffer;
-reg          wre_sdram_manager__mapper__buffer;
 reg  [31:0]  dout_sdram_manager__mapper__buffer;
 always @(posedge clk) begin
-    wre_sdram_manager__mapper__buffer<=wre_sdram_manager__mapper;
-    addr_sdram_manager__mapper__buffer<=addr_sdram_manager__mapper;
-    din_sdram_manager__mapper__buffer<=din_sdram_manager__mapper;
     dout_sdram_manager__mapper<=dout_sdram_manager__mapper__buffer;
 end
 
@@ -95,27 +105,35 @@ sdram_arbiter sdram_arbiter_ins(
     .clk(clk),
     .rst_n(rst_n),
     .addr_sdram_manager__pixel_ppu(addr_sdram_manager__pixel_ppu),
+    .addr_sdram_manager__pixel_cpu(addr_sdram_manager__pixel_cpu),
     .addr_sdram_manager__mapper(addr_sdram_manager__mapper),
     .addr_sdram_manager__hdmi_controller(addr_sdram_manager__hdmi_controller),
     .din_sdram_manager__pixel_ppu(din_sdram_manager__pixel_ppu),
+    .din_sdram_manager__pixel_cpu(din_sdram_manager__pixel_cpu),
     .din_sdram_manager__mapper(din_sdram_manager__mapper),
     .din_sdram_manager__hdmi_controller(din_sdram_manager__hdmi_controller),
     .wre_sdram_manager__mapper(wre_sdram_manager__mapper),
     .wre_sdram_manager__pixel_ppu(wre_sdram_manager__pixel_ppu),
+    .wre_sdram_manager__pixel_cpu(wre_sdram_manager__pixel_cpu),
     .wre_sdram_manager__hdmi_controller(wre_sdram_manager__hdmi_controller),
     .mapper_in_control(mapper_in_control),
     .hdmi_controller_in_control(hdmi_controller_in_control),
     .pixel_ppu_in_control(pixel_ppu_in_control),
+    .pixel_cpu_in_control(pixel_cpu_in_control),
     .wre_pulse_from_mapper(wre_pulse_from_mapper),
     .wre_pulse_from_pixel_ppu(wre_pulse_from_pixel_ppu),
+    .wre_pulse_from_pixel_cpu(wre_pulse_from_pixel_cpu),
     .wre_pulse_from_hdmi_controller(wre_pulse_from_hdmi_controller),
     .request_to_do_op_in_sdram(req__op_in_sdram),
     .request_to_do_op_in_sdram_ack(req_op_in_sdram_ack),
     .addr_sdram_manager_to_process(addr_sdram_manager_to_process),
     .din_sdram_manager_to_process(din_sdram_manager_to_process),
     .processing_request_from__pixel_ppu(processing_request_from__pixel_ppu),
+    .processing_request_from__pixel_cpu(processing_request_from__pixel_cpu),
     .processing_request_from__hdmi_controller(processing_request_from__hdmi_controller),
-    .processing_request_from__mapper(processing_request_from__mapper)
+    .processing_request_from__mapper(processing_request_from__mapper),
+    .hdmi_ctrl_is_standby(hdmi_ctrl_is_standby),
+    .debug_signal(debug_signal)
 );
 
 reg busy_intern;
@@ -173,28 +191,80 @@ always @(posedge clk) begin
     end
 end
 
+always @(posedge clk) begin
+    if(cpu_reseted) begin
+        count_pulses_where_sdram_controller_is_idle<=64'h0;
+    end
+    else if(state==STATE_IDLE) begin
+        if(cpu_enabled)
+            count_pulses_where_sdram_controller_is_idle<=count_pulses_where_sdram_controller_is_idle+64'h1;
+    end
+end
 
 
+reg  set_op_pixel_ppu__prev;
+reg  wre_sdram_manager__hdmi_controller__prev;
+reg  [6:0] n_elements_processed_from_pixel_ppu_request;
+reg  [6:0] n_elements_processed_from_hdmi_request;
+reg  set_n_elements_processed_by_request;
+reg  set_n_elements_processed_by_request_prev;
+localparam addr_to_set_op                =   22'b1000000000000000000000;
+wire set_op_pixel_ppu= wre_sdram_manager__pixel_ppu&&(addr_to_set_op==addr_sdram_manager__pixel_ppu[21:0]);
+always @(posedge clk) begin
+    if(!rst_n) begin
+        n_elements_processed_from_pixel_ppu_request<=7'b0;
+        n_elements_processed_from_hdmi_request<=7'b0;
+        set_n_elements_processed_by_request_prev<=1'b0;
+        wre_sdram_manager__hdmi_controller__prev<=1'b0;
+        set_op_pixel_ppu__prev<=1'b0;
+        n_32bits_words_processed_by_current_pixel_ppu_request<=7'b0;
+    end
+    else begin
+         
+        set_n_elements_processed_by_request_prev<=set_n_elements_processed_by_request;
+        set_op_pixel_ppu__prev<=set_op_pixel_ppu;
+        wre_sdram_manager__hdmi_controller__prev<=wre_sdram_manager__hdmi_controller;
+        if(set_op_pixel_ppu__prev==1'b0 && set_op_pixel_ppu==1'b1) begin
+            n_32bits_words_processed_by_current_pixel_ppu_request<=7'b0;
+        end
+        else if(pixel_ppu_in_control) begin
+            n_32bits_words_processed_by_current_pixel_ppu_request<=amount_of_32bit_words_processed_by_current_request;
+        end
+    
+        if(wre_sdram_manager__hdmi_controller__prev==1'b0 && wre_sdram_manager__hdmi_controller==1'b1) begin
+            n_elements_processed_from_hdmi_request<=7'b0000000;
+        end
+    end
+end
 
 
 
 reg  [31:0] rd_data_r__mapper [64];
 reg  [31:0] rd_data_r__pixel_ppu [64];
+reg  [31:0] rd_data_r__pixel_cpu [64];
 reg  [31:0] rd_data_r__hdmi_controller [64];
+
 
 reg  [5:0] point_to___rd_data_r;
 
 
 reg  [31:0] wr_data_r__mapper [64];
 reg  [31:0] wr_data_r__pixel_ppu [64];
+reg  [31:0] wr_data_r__pixel_cpu [64];
 reg  [31:0] wr_data_r__hdmi_controller [64];
 reg  [5:0] point_to___wr_data_r;
+
+
+reg  [5:0] point_to___wr_data_r___latch__hdmi;
 
 
 wire addr_sdram_manager__mapper____in_region_to_write_in__wr_data_r;
 assign addr_sdram_manager__mapper____in_region_to_write_in__wr_data_r           = addr_sdram_manager__mapper[21:13]==9'b100000001;
 wire addr_sdram_manager__pixel_ppu____in_region_to_write_in__wr_data_r;
 assign addr_sdram_manager__pixel_ppu____in_region_to_write_in__wr_data_r        = addr_sdram_manager__pixel_ppu[21:13]==9'b100000001;
+wire addr_sdram_manager__pixel_cpu____in_region_to_write_in__wr_data_r;
+assign addr_sdram_manager__pixel_cpu____in_region_to_write_in__wr_data_r        = addr_sdram_manager__pixel_cpu[21:13]==9'b100000001;
+
 wire addr_sdram_manager__hdmi_controller____in_region_to_write_in__wr_data_r;
 assign addr_sdram_manager__hdmi_controller____in_region_to_write_in__wr_data_r  = addr_sdram_manager__hdmi_controller[21:13]==9'b100000001;
 
@@ -204,6 +274,9 @@ always @(posedge clk) begin
     end
     if(addr_sdram_manager__pixel_ppu____in_region_to_write_in__wr_data_r && wre_sdram_manager__pixel_ppu) begin
         wr_data_r__pixel_ppu[addr_sdram_manager__pixel_ppu[5:0]]<=din_sdram_manager__pixel_ppu;
+    end
+    if(addr_sdram_manager__pixel_cpu____in_region_to_write_in__wr_data_r && wre_sdram_manager__pixel_cpu) begin
+        wr_data_r__pixel_cpu[addr_sdram_manager__pixel_cpu[5:0]]<=din_sdram_manager__pixel_cpu;
     end
     if(addr_sdram_manager__hdmi_controller____in_region_to_write_in__wr_data_r && wre_sdram_manager__hdmi_controller) begin
         wr_data_r__hdmi_controller[addr_sdram_manager__hdmi_controller[5:0]]<=din_sdram_manager__hdmi_controller;
@@ -233,10 +306,13 @@ localparam get_addr__hdmi_controller     =   22'b1000000000000000010101;
 localparam get_wre__hdmi_controller      =   22'b1000000000000000010110;
 
 assign dout_sdram_manager__hdmi_controller=   addr_sdram_manager__hdmi_controller[21]==1'b0 ? rd_data_r__hdmi_controller[addr_sdram_manager__hdmi_controller[5:0]] : 32'h000000;
+assign dout_sdram_manager__pixel_cpu=         addr_sdram_manager__pixel_cpu[21]==1'b0       ? rd_data_r__pixel_cpu[addr_sdram_manager__pixel_cpu[5:0]]             : 32'h000000;
+
 always @(posedge clk) begin
     if(addr_sdram_manager__pixel_ppu[21]==1'b0) begin
         dout_sdram_manager__pixel_ppu<= rd_data_r__pixel_ppu[addr_sdram_manager__pixel_ppu[5:0]]; 
     end
+
     /****
     if(addr_sdram_manager__hdmi_controller[21]==1'b0) begin
         dout_sdram_manager__hdmi_controller<= rd_data_r__hdmi_controller[addr_sdram_manager__hdmi_controller[5:0]]; 
@@ -244,45 +320,21 @@ always @(posedge clk) begin
     ****/
     
     if(addr_sdram_manager__mapper[21:16]==6'b000000) begin
-        dout_sdram_manager__mapper__buffer<= rd_data_r__mapper[addr_sdram_manager__mapper[5:0]]; 
+        if(addr_sdram_manager__mapper[9]==1'b0) begin
+            dout_sdram_manager__mapper__buffer<= rd_data_r__mapper[addr_sdram_manager__mapper[5:0]]; 
+        end
+        else begin
+            dout_sdram_manager__mapper__buffer<= {31'h0,processing_request_from__mapper}; 
+        end
     end
-    /***
-    else if(addr_sdram_manager__mapper[21:16]==6'b000001) begin
-        dout_sdram_manager__mapper__buffer<= rd_data_r__hdmi_controller[addr_sdram_manager__mapper[5:0]]; 
-    end
-    else if(addr_sdram_manager__mapper==addr_to_get_busy) begin
-        dout_sdram_manager__mapper__buffer<=busy_intern; //|req__op_in_sdram;
-    end
-    else if (addr_sdram_manager__mapper==get_op_happen_in_two_rows) begin
-        dout_sdram_manager__mapper__buffer<={31'b0,op_will_hapen_in_two_rows}; ;
-    end
-    else if (addr_sdram_manager__mapper ==get_amount_of_data_in_first_r) begin
-        dout_sdram_manager__mapper__buffer<={26'b0,amount_of_data_in_first_row_minus_1};
-    end
-    else if (addr_sdram_manager__mapper ==get_amount_of_data_in_secon_r) begin
-        dout_sdram_manager__mapper__buffer<={26'b0,amount_of_data_in_second_row_minus_1};
-    end
-    else if(addr_sdram_manager__mapper==get_proc_req_from__mapper) begin
-        dout_sdram_manager__mapper__buffer<={31'b0,processing_request_from__mapper__latch};
-    end
-    else if(addr_sdram_manager__mapper==ger_proc_req_from__hdmi_ctrl) begin
-        dout_sdram_manager__mapper__buffer<={31'b0,processing_request_from__hdmi_controller};
-    end
-    else if(addr_sdram_manager__mapper==get_proc_req_from__pixel_ppu) begin
-        dout_sdram_manager__mapper__buffer<={31'b0,processing_request_from__pixel_ppu};
-    end
-    else if(addr_sdram_manager__mapper==get_addr__hdmi_controller)
-        dout_sdram_manager__mapper__buffer<={10'b0,addr_sdram_manager__hdmi_controller};
-    else if(addr_sdram_manager__mapper==get_wre__hdmi_controller)
-        dout_sdram_manager__mapper__buffer<={31'b0,wre_sdram_manager__hdmi_controller};
-    ***/
+
     else begin
         dout_sdram_manager__mapper__buffer<=32'h00000000;
     end
 end
 
 
-
+reg [6:0] amount_of_32bit_words_processed_by_current_request;
 
 reg  [11:0] count_to_refresh_ram;
 wire [1:0]  w_bank;
@@ -304,7 +356,13 @@ wire [5:0]  amount_of_data_to_process_in_the_row_minus_1=  processing_first_row?
 wire [31:0] current_wr_data =
             mapper_in_control          ?    wr_data_r__mapper[point_to___wr_data_r] :
             hdmi_controller_in_control ?    wr_data_r__hdmi_controller[point_to___wr_data_r] :
-                                            wr_data_r__pixel_ppu[point_to___wr_data_r];
+            pixel_ppu_in_control       ?    wr_data_r__pixel_ppu[point_to___wr_data_r] :
+                                            wr_data_r__pixel_cpu[point_to___wr_data_r];
+
+
+assign  n_32bits_words_processed_by_current_hdmi_request  =
+        hdmi_controller_in_control                              ?   amount_of_32bit_words_processed_by_current_request:
+                                                                    n_elements_processed_from_hdmi_request;
 always @(posedge clk) begin
     if(!rst_n) begin
         busy_intern<=1'b1;
@@ -321,8 +379,10 @@ always @(posedge clk) begin
         processing_first_row<=1'b0;
         point_to___rd_data_r<=6'b000000;
         point_to___wr_data_r<=6'b000000;
+        amount_of_32bit_words_processed_by_current_request<=7'b0000000;
         count_to_refresh_ram<=12'h000;
         req_op_in_sdram_ack<=1'b0;
+        set_n_elements_processed_by_request<=1'b0;
     end
     else begin
         if(count_to_refresh_ram>=12'h39b && state==STATE_IDLE)
@@ -340,9 +400,8 @@ always @(posedge clk) begin
                     busy_intern<=1'b1; 
                 end
                 req_op_in_sdram_ack<=1'b0;
-
             end
-            STATE_IDLE: begin     
+            STATE_IDLE: begin
                 req_op_in_sdram_ack<=1'b0;
                 if(req__op_in_sdram_from_define_signals) begin
                     point_to___rd_data_r<=6'b000000;
@@ -360,9 +419,13 @@ always @(posedge clk) begin
                     busy_intern<=1'b1; 
                     amount_of_data_processed_in_the_row<=6'b000000;
                     processing_first_row<=1'b1;
+                    set_n_elements_processed_by_request<=1'b0;
+                    amount_of_32bit_words_processed_by_current_request<=7'b0000000;
                 end
                 else begin
                     busy_intern<=1'b0;
+                    I_sdrc_cmd_en <= 1'b0;
+
                     if(count_to_refresh_ram>=12'h39b)begin
                         state<=STATE_REFRESH_P1;
                     end
@@ -386,11 +449,16 @@ always @(posedge clk) begin
             STATE_READING_DATA: begin
                 I_sdrc_cmd_en<=1'b0;
                 if(sync__state && time_that_stage_hold>=3) begin
-                    if(mapper_in_control) rd_data_r__mapper[point_to___rd_data_r] <= O_sdrc_data;
+                    if(mapper_in_control) begin 
+                        rd_data_r__mapper[point_to___rd_data_r] <= O_sdrc_data;
+
+                    end 
                     else if(hdmi_controller_in_control) rd_data_r__hdmi_controller[point_to___rd_data_r] <= O_sdrc_data;
-                    else rd_data_r__pixel_ppu[point_to___rd_data_r] <= O_sdrc_data;                        
+                    else if(pixel_ppu_in_control) rd_data_r__pixel_ppu[point_to___rd_data_r] <= O_sdrc_data;
+                    else rd_data_r__pixel_cpu[point_to___rd_data_r] <= O_sdrc_data;                        
                     point_to___rd_data_r <= point_to___rd_data_r + 6'b000001;
                     amount_of_data_processed_in_the_row<=amount_of_data_processed_in_the_row+ 6'b000001;
+                    amount_of_32bit_words_processed_by_current_request<=amount_of_32bit_words_processed_by_current_request+7'b0000001;
                     if(amount_of_data_processed_in_the_row==amount_of_data_to_process_in_the_row_minus_1)
                         state<=STATE_FINISHING_OP_IN_ROW;
                 end
@@ -404,6 +472,7 @@ always @(posedge clk) begin
                     I_sdrc_cmd_en <= 1'b1;
                     I_sdrc_cmd <= CMD_WRITE;
                     amount_of_data_processed_in_the_row<=amount_of_data_processed_in_the_row+ 6'b000001;
+                    amount_of_32bit_words_processed_by_current_request<=amount_of_32bit_words_processed_by_current_request+7'b0000001;
                     if(amount_of_data_processed_in_the_row==amount_of_data_to_process_in_the_row_minus_1) 
                         state<=STATE_FINISHING_OP_IN_ROW;
                     else
@@ -418,6 +487,7 @@ always @(posedge clk) begin
                 I_sdrc_data<=current_wr_data;
                 point_to___wr_data_r <= point_to___wr_data_r + 6'b000001;
                 amount_of_data_processed_in_the_row<=amount_of_data_processed_in_the_row+ 6'b000001;
+                amount_of_32bit_words_processed_by_current_request<=amount_of_32bit_words_processed_by_current_request+7'b0000001;
                 if(amount_of_data_processed_in_the_row== amount_of_data_to_process_in_the_row_minus_1)
                     state<=STATE_FINISHING_OP_IN_ROW;
             end
@@ -442,7 +512,6 @@ always @(posedge clk) begin
                     end
                 end
                 else  begin 
-                    req_op_in_sdram_ack<=1'b1;
                     if(time_that_stage_hold==8'h05 && sync__state) begin
                         I_sdrc_cmd_en<=1'b0;
                         state <= STATE_IDLE;
@@ -450,6 +519,15 @@ always @(posedge clk) begin
                         I_sdrc_cmd<=CMD_NOP;
                         processing_first_row<=1'b1;
                     end
+                     if( time_that_stage_hold==8'h00 && sync__state) begin
+                        set_n_elements_processed_by_request<=1'b1;
+                     end
+                     else if( time_that_stage_hold==8'h01 && sync__state) begin
+                        set_n_elements_processed_by_request<=1'b0;
+                     end
+                     else if( time_that_stage_hold>=8'h03 && sync__state) begin 
+                        req_op_in_sdram_ack<=1'b1;
+                     end
                 end
             end
             STATE_REFRESH_P1: begin

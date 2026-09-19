@@ -11,3 +11,4 @@
 //create_clock -name main_clock -period 13.468 -waveform {0 6.734} [get_nets {clkout}]
 create_clock -name clock_send_data_hdmi -period 2.692 -waveform {0 1.346} [get_nets {hdmi_inst/serial_clk}]
 create_clock -name pixel_clock -period 13.468 -waveform {0 6.734} [get_nets {clk}]
+//create_clock -name clk_cpu  -period 16.6667 -waveform {0 8.3333} [get_nets {clk_cpu}]

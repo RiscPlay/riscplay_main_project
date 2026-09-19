@@ -10,7 +10,9 @@ module spi (
     output  wire  [31:0]    addr_main_memory___recvdata0,
     output  wire  [31:0]    din_main_memory___recvdata0,
     output  wire            wre_main_memory___recvdata0,
-    input   wire  [31:0]    dout_mapper
+    input   wire  [31:0]    dout_mapper,
+    output  wire            spi_comm_started,
+    input   wire            spi_can_access_memory
 );
 
 
@@ -92,7 +94,8 @@ senddata senddata0 (
     .op_args(op_args),
 
     .addr_main_memory(addr_main_memory___senddata0),
-    .dout_main_memory(dout_mapper)
+    .dout_main_memory(dout_mapper),
+    .spi_can_access_memory(spi_can_access_memory)
 );
 
 recvdata recvdata0 (
@@ -123,7 +126,9 @@ recvdata recvdata0 (
 
     .addr_main_memory(addr_main_memory___recvdata0),
     .din_main_memory(din_main_memory___recvdata0),
-    .wre_main_memory(wre_main_memory___recvdata0)
+    .wre_main_memory(wre_main_memory___recvdata0),
+    .spi_can_access_memory(spi_can_access_memory)
+
 );
 
 
@@ -155,7 +160,8 @@ consumer_spi #(N_BITS_TO_ADDRESS_MODULES,N_MODULES) consumer_spi_0
     .crc_bytes_processed(mux__crc_bytes_processed____for_consumer_spi_mods[ID_MODULE____SPI___CONSUMER_SPI]),
     .ready_for_recv_data(mux__crc32_module_is_ready_for_recv_data____for_consumer_spi_mods[ID_MODULE____SPI___CONSUMER_SPI]),
     .op_args(op_args),
-    .sel___main_memory(sel___main_memory)
+    .sel___main_memory(sel___main_memory),
+    .spi_comm_started(spi_comm_started)
 );
 
 spi_slave spi_slave_0(

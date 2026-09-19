@@ -25,7 +25,9 @@ module senddata (
     input  wire  [63:0] op_args,
 
     output reg    [31:0] addr_main_memory,
-    input  wire   [31:0] dout_main_memory
+    input  wire   [31:0] dout_main_memory,
+    input  wire          spi_can_access_memory
+
 );
 
 localparam [3:0] RESET_STATE                                =  4'hf;
@@ -90,7 +92,7 @@ always @(posedge clk) begin
             default: state<=STATE_START;
 
             STATE_LOAD_DATA: begin
-                if(sync__state & time_that_stage_hold>4'h1) begin
+                if(sync__state & time_that_stage_hold>4'h1 & spi_can_access_memory) begin
                     four_lasts_bytes_to_send<=dout_main_memory;
                     state<=STATE_PUT_DATA_IN_FIFO;
                 end

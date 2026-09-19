@@ -1,15 +1,26 @@
 `include "sdrc_defines.v"
 //https://github.com/calint/tang-nano-20k--riscv--cache-sdram
 module top (
-    input             I_clk,
-    output  reg   [5:0]  led,
-    inout      [3:0]  GPIO,
-    input             I_rst           ,
-    output            O_tmds_clk_p    ,
-    output            O_tmds_clk_n    ,
-    output     [2:0]  O_tmds_data_p   ,//{r,g,b}
-    output     [2:0]  O_tmds_data_n   ,
+    input              I_clk,
+    output reg  [5:0]  led,
+    inout       [3:0]  GPIO,
+    input              I_rst           ,
+    output             O_tmds_clk_p    ,
+    output             O_tmds_clk_n    ,
+    output      [2:0]  O_tmds_data_p   ,//{r,g,b}
+    output      [2:0]  O_tmds_data_n   ,
     
+    output            ds_clk2,
+    input             ds_miso2,
+    output            ds_mosi2,
+    output            ds_cs2,
+
+    output            ds_clk,
+    input             ds_miso,
+    output            ds_mosi,
+    output            ds_cs,
+
+
     // "magic" port names that the Gowin EDA connects to the on-chip SDRAM
     output wire        O_sdram_clk,    // clock
     output wire        O_sdram_cke,    // clock enable
@@ -23,6 +34,23 @@ module top (
     output wire [ 3:0] O_sdram_dqm     // data mask (byte enable)
     
 );
+wire reset_cpu;
+wire enable;
+
+wire [31:0] debug_signal;
+reg  [63:0] count_pulses_since_riscv_started;
+always @(posedge clk) begin
+    if(reset_cpu) begin
+        count_pulses_since_riscv_started<=64'h0;
+    end
+    else if(enable) begin
+            count_pulses_since_riscv_started<=count_pulses_since_riscv_started+64'h1;
+    end
+end
+
+wire  [63:0] count_pulses_where_sdram_controller_is_idle;
+wire  [63:0] count_pulses_where_ppu_is_idle;
+
 
 
 
@@ -35,22 +63,26 @@ reg lock_pll;
 wire lock_pll;
 `endif
 
-/*
-wire clkoutp;
-pll ppl_ins (
-    .clkin(I_clk),
-    .clkout(clkout),
-    .lock(lock_pll),
-    .clkoutp(clkoutp)
-);
-assign clk=clkout;
-*/
 
 
 
 
-
-
+reg n_reset_global=1'b0;
+reg [3:0] count_for_reset_global=4'h0;
+always @(posedge clk) begin
+    if(lock_pll) begin
+        if(count_for_reset_global==4'ha) begin
+            n_reset_global<=1'b1;
+        end
+        else begin
+            n_reset_global<=1'b0;
+            count_for_reset_global<=count_for_reset_global+4'h1;
+        end
+    end
+    else begin
+        n_reset_global<=1'b0;
+    end
+end
 
 
 
@@ -74,7 +106,20 @@ TMDS_rPLL u_tmds_rpll
 ,.clkout    (serial_clk)     //output clk 
 ,.lock      (lock_pll  )     //output lock
 );
-wire [31:0] debug_signal_draw;
+wire        set_addr_to_frame_buffer;
+wire [20:0] addr_to_frame_buffer;
+wire        set_addr_to_frame_buffer__ack;
+wire [20:0] fb_horizontal_offset;
+
+
+wire [6:0]   n_32bits_words_processed_by_current_hdmi_request;
+wire [21:0]  addr_sdram_manager__hdmi_controller;
+wire [31:0]  din_sdram_manager__hdmi_controller;
+wire [31:0]  dout_sdram_manager__hdmi_controller;
+wire         wre_sdram_manager__hdmi_controller;
+wire         processing_request_from__hdmi_controller;
+
+wire         hdmi_ctrl_is_standby;
 HDMI hdmi_inst(
     .I_clk(I_clk),
     .I_rst(I_rst),
@@ -91,14 +136,19 @@ HDMI hdmi_inst(
     .din_sdram_manager__hdmi_controller(din_sdram_manager__hdmi_controller),
     .dout_sdram_manager__hdmi_controller(dout_sdram_manager__hdmi_controller),
     .wre_sdram_manager__hdmi_controller(wre_sdram_manager__hdmi_controller),
-    .debug_signal_draw(debug_signal_draw)
+    .set_addr_to_frame_buffer(set_addr_to_frame_buffer),
+    .addr_to_frame_buffer(addr_to_frame_buffer),
+    .fb_horizontal_offset__input(fb_horizontal_offset),
+    .set_addr_to_frame_buffer__ack(set_addr_to_frame_buffer__ack),
+    .processing_request_from__hdmi_controller(processing_request_from__hdmi_controller),
+    .n_32bits_words_processed_by_current_hdmi_request(n_32bits_words_processed_by_current_hdmi_request),
+    .hdmi_ctrl_is_standby(hdmi_ctrl_is_standby)
 );
 `endif
 
 `ifdef SIM
 assign clkout=I_clk;
 `endif
-//assign clk=clkout;
 
 
 
@@ -135,79 +185,74 @@ always @(posedge clk) begin
     end
 end
 
-reg n_reset_global=1'b0;
-reg [3:0] count_for_reset_global=4'h0;
-always @(posedge clk) begin
-    if(lock_pll) begin
-        if(count_for_reset_global==4'ha) begin
-            n_reset_global<=1'b1;
-        end
-        else begin
-            n_reset_global<=1'b0;
-            count_for_reset_global<=count_for_reset_global+4'h1;
-        end
-    end
-    else begin
-        n_reset_global<=1'b0;
-    end
-end
 
 
 
-  wire I_sdrc_rst_n =  !reset_ram && lock_pll;
-  wire I_sdrc_clk = clk;
-  wire I_sdram_clk = clk;
-  wire I_sdrc_cmd_en;
-  wire [2:0] I_sdrc_cmd;
-  wire I_sdrc_precharge_ctrl;
-  wire I_sdram_power_down;
-  wire [20:0] I_sdrc_addr;
-  wire [3:0] I_sdrc_dqm;
-  wire [31:0] I_sdrc_data;
-  wire [7:0] I_sdrc_data_len;
-  wire [31:0] O_sdrc_data;
-  wire O_sdrc_init_done;
-  wire O_sdrc_cmd_ack;
 
-  SDRAM_Controller_HS_Top sdram_controller (
-      // inferred ports connecting SDRAM
-      .O_sdram_clk(O_sdram_clk),
-      .O_sdram_cke(O_sdram_cke),
-      .O_sdram_cs_n(O_sdram_cs_n),
-      .O_sdram_cas_n(O_sdram_cas_n),
-      .O_sdram_ras_n(O_sdram_ras_n),
-      .O_sdram_wen_n(O_sdram_wen_n),
-      .O_sdram_dqm(O_sdram_dqm),
-      .O_sdram_addr(O_sdram_addr),
-      .O_sdram_ba(O_sdram_ba),
-      .IO_sdram_dq(IO_sdram_dq),
+wire I_sdrc_rst_n =  !reset_ram && lock_pll;
+wire I_sdrc_clk = clk;
+wire I_sdram_clk = clk;
+wire I_sdrc_cmd_en;
+wire [2:0] I_sdrc_cmd;
+wire I_sdrc_precharge_ctrl;
+wire I_sdram_power_down;
+wire [20:0] I_sdrc_addr;
+wire [3:0] I_sdrc_dqm;
+wire [31:0] I_sdrc_data;
+wire [7:0] I_sdrc_data_len;
+wire [31:0] O_sdrc_data;
+wire O_sdrc_init_done;
+wire O_sdrc_cmd_ack;
 
-      // interface
-      .I_sdrc_rst_n(I_sdrc_rst_n),
-      .I_sdrc_clk(I_sdrc_clk),
-      .I_sdram_clk(I_sdram_clk),
-      .I_sdrc_cmd_en(I_sdrc_cmd_en),
-      .I_sdrc_cmd(I_sdrc_cmd),
-      .I_sdrc_precharge_ctrl(I_sdrc_precharge_ctrl),
-      .I_sdram_power_down(I_sdram_power_down),
-      .I_sdram_selfrefresh(I_sdram_selfrefresh),
-      .I_sdrc_addr(I_sdrc_addr),
-      .I_sdrc_dqm(I_sdrc_dqm),
-      .I_sdrc_data(I_sdrc_data),
-      .I_sdrc_data_len(I_sdrc_data_len),
-      .O_sdrc_data(O_sdrc_data),
-      .O_sdrc_init_done(O_sdrc_init_done),
-      .O_sdrc_cmd_ack(O_sdrc_cmd_ack)
-  );
-wire [21:0]  addr_sdram_manager__hdmi_controller;
-wire [31:0]  din_sdram_manager__hdmi_controller;
-wire [31:0]  dout_sdram_manager__hdmi_controller;
-wire         wre_sdram_manager__hdmi_controller;
-wire         processing_request_from__hdmi_controller;
+SDRAM_Controller_HS_Top sdram_controller (
+    // inferred ports connecting SDRAM
+    .O_sdram_clk(O_sdram_clk),
+    .O_sdram_cke(O_sdram_cke),
+    .O_sdram_cs_n(O_sdram_cs_n),
+    .O_sdram_cas_n(O_sdram_cas_n),
+    .O_sdram_ras_n(O_sdram_ras_n),
+    .O_sdram_wen_n(O_sdram_wen_n),
+    .O_sdram_dqm(O_sdram_dqm),
+    .O_sdram_addr(O_sdram_addr),
+    .O_sdram_ba(O_sdram_ba),
+    .IO_sdram_dq(IO_sdram_dq),
+
+    // interface
+    .I_sdrc_rst_n(I_sdrc_rst_n),
+    .I_sdrc_clk(I_sdrc_clk),
+    .I_sdram_clk(I_sdram_clk),
+    .I_sdrc_cmd_en(I_sdrc_cmd_en),
+    .I_sdrc_cmd(I_sdrc_cmd),
+    .I_sdrc_precharge_ctrl(I_sdrc_precharge_ctrl),
+    .I_sdram_power_down(I_sdram_power_down),
+    .I_sdram_selfrefresh(I_sdram_selfrefresh),
+    .I_sdrc_addr(I_sdrc_addr),
+    .I_sdrc_dqm(I_sdrc_dqm),
+    .I_sdrc_data(I_sdrc_data),
+    .I_sdrc_data_len(I_sdrc_data_len),
+    .O_sdrc_data(O_sdrc_data),
+    .O_sdrc_init_done(O_sdrc_init_done),
+    .O_sdrc_cmd_ack(O_sdrc_cmd_ack)
+);
+
 wire [21:0]  addr_sdram_manager__mapper;
 wire [31:0]  din_sdram_manager__mapper;
 wire [31:0]  dout_sdram_manager__mapper;
 wire         wre_sdram_manager__mapper;
+
+
+wire  [21:0]  addr_sdram_manager__pixel_cpu;
+wire  [31:0]  din_sdram_manager__pixel_cpu;
+wire  [31:0]  dout_sdram_manager__pixel_cpu;
+wire          wre_sdram_manager__pixel_cpu;
+
+
+wire [21:0] addr_sdram_manager__pixel_ppu;
+wire [31:0] din_sdram_manager__pixel_ppu;
+wire [31:0] dout_sdram_manager__pixel_ppu;
+wire        wre_sdram_manager__pixel_ppu;
+wire        processing_request_from__pixel_ppu;
+wire [6:0]  n_32bits_words_processed_by_current_pixel_ppu_request;
 sdram_manager sdram_manager__ins(
     .clk(clk),
     .rst_n(n_reset_global),
@@ -220,6 +265,10 @@ sdram_manager sdram_manager__ins(
     .dout_sdram_manager__hdmi_controller(dout_sdram_manager__hdmi_controller),
     .wre_sdram_manager__hdmi_controller(wre_sdram_manager__hdmi_controller),
     .processing_request_from__hdmi_controller(processing_request_from__hdmi_controller),
+    .addr_sdram_manager__pixel_cpu(addr_sdram_manager__pixel_cpu),
+    .din_sdram_manager__pixel_cpu(din_sdram_manager__pixel_cpu),
+    .dout_sdram_manager__pixel_cpu(dout_sdram_manager__pixel_cpu),
+    .wre_sdram_manager__pixel_cpu(wre_sdram_manager__pixel_cpu),
     .O_sdrc_init_done(O_sdrc_init_done),
     .O_sdrc_cmd_ack(O_sdrc_cmd_ack),
     .O_sdrc_data(O_sdrc_data),
@@ -231,11 +280,23 @@ sdram_manager sdram_manager__ins(
     .I_sdrc_addr(I_sdrc_addr),
     .I_sdrc_dqm(I_sdrc_dqm),
     .I_sdrc_data(I_sdrc_data),
-    .I_sdrc_data_len(I_sdrc_data_len)
+    .I_sdrc_data_len(I_sdrc_data_len),
+    .addr_sdram_manager__pixel_ppu(addr_sdram_manager__pixel_ppu),
+    .din_sdram_manager__pixel_ppu(din_sdram_manager__pixel_ppu),
+    .dout_sdram_manager__pixel_ppu(dout_sdram_manager__pixel_ppu),
+    .wre_sdram_manager__pixel_ppu(wre_sdram_manager__pixel_ppu),
+    .processing_request_from__pixel_ppu(processing_request_from__pixel_ppu),
+    .hdmi_ctrl_is_standby(hdmi_ctrl_is_standby),
+    //.debug_signal(debug_signal),
+    .cpu_reseted(reset_cpu),
+    .cpu_enabled(enable),
+    .count_pulses_where_sdram_controller_is_idle(count_pulses_where_sdram_controller_is_idle),
+    .n_32bits_words_processed_by_current_pixel_ppu_request(n_32bits_words_processed_by_current_pixel_ppu_request),
+    .n_32bits_words_processed_by_current_hdmi_request(n_32bits_words_processed_by_current_hdmi_request)
 );
 
 
-wire reset_cpu;
+
 
 wire [3:0] sel___main_memory;
 
@@ -288,7 +349,8 @@ assign wre_mapper =
     (sel___main_memory == 4'h2) ?  wre_main_memory___recvdata0:
     wre_main_memory___rv32im_cpu_inst;
 
-
+wire spi_comm_started;
+wire spi_can_access_memory;
 spi spi_ins (
     .clk(clk),
     .lock_pll(lock_pll),
@@ -301,7 +363,150 @@ spi spi_ins (
     .addr_main_memory___recvdata0(addr_main_memory___recvdata0),
     .din_main_memory___recvdata0(din_main_memory___recvdata0),
     .wre_main_memory___recvdata0(wre_main_memory___recvdata0),
-    .dout_mapper(dout_mapper)
+    .dout_mapper(dout_mapper),
+    .spi_comm_started(spi_comm_started),
+    .spi_can_access_memory(spi_can_access_memory)
+
+);
+
+
+wire [31:0] dout_pixel_cpu_mem;
+wire [31:0] din_pixel_cpu_mem;
+wire        wre_pixel_cpu_mem;
+wire [11:0] ad_pixel_cpu_mem;
+
+
+wire [31:0] dout_pixel_mapper;
+wire [31:0] din_pixel_mapper;
+wire        wre_pixel_mapper;
+wire [31:0] ad_pixel_mapper;
+
+wire [11:0] ad_pixel_ppu__for_mapper_of_main_cpu;
+wire [31:0] din_pixel_ppu__for_mapper_of_main_cpu;
+wire [31:0] dout_pixel_ppu__for_mapper_of_main_cpu;
+wire        wre_pixel_ppu__for_mapper_of_main_cpu;
+/********
+Gowin_DPB__CPU_PIXEL_MEMORY memory_pixel_cpu (
+    .ada(ad_pixel_cpu_mem),
+    .dina(din_pixel_cpu_mem),
+    .douta(dout_pixel_cpu_mem),
+	.wrea(wre_pixel_cpu_mem),
+
+    .adb(ad_pixel_ppu__for_mapper_of_main_cpu),
+	.dinb(din_pixel_ppu__for_mapper_of_main_cpu),
+    .doutb(dout_pixel_ppu__for_mapper_of_main_cpu),
+    .wreb(wre_pixel_ppu__for_mapper_of_main_cpu),
+
+    .ocea(1'b1),
+    .cea(1'b1),
+    .reseta(1'b0),
+    .oceb(1'b1),
+    .ceb(1'b1),
+    .resetb(1'b0),
+    .clka(clk),
+    .clkb(clk)
+);
+**********/
+wire [13:0] ad_pixel___tile_memory;
+wire [7:0]  dout_pixel___tile_memory;
+wire [7:0]  din_pixel___tile_memory;
+wire        wre_pixel___tile_memory;
+
+wire [13:0] ad_cpu___tile_memory;
+wire [7:0]  dout_cpu___tile_memory;
+wire [7:0]  din_cpu___tile_memory;
+wire        wre_cpu___tile_memory;
+Gowin_DPB_Tile tile_memory(
+        .clka(clk), //input clka
+        .ada(ad_pixel___tile_memory), //input [13:0] ada
+        .douta(dout_pixel___tile_memory), //output [7:0] douta
+        .dina(din_pixel___tile_memory), //input [7:0] dina
+        .wrea(wre_pixel___tile_memory), //input wrea
+
+        .clkb(clk), //input clkb
+        .adb(ad_cpu___tile_memory), //input [13:0] adb
+        .doutb(dout_cpu___tile_memory), //output [7:0] doutb
+        .dinb(din_cpu___tile_memory), //input [7:0] dinb
+        .wreb(wre_cpu___tile_memory), //input wreb
+
+        .ocea(1'b1), //input ocea
+        .cea(1'b1), //input cea
+        .reseta(1'b0), //input reseta
+        .oceb(1'b1), //input oceb
+        .ceb(1'b1), //input ceb
+        .resetb(1'b0) //input resetb
+    
+);
+wire [15:0] out___collision_stack_cpu;
+wire        wre___collision_stack_cpu;
+wire [15:0] input___collision_stack_cpu;
+wire [9:0]  addr___collision_stack_cpu;
+
+wire [7:0]  out_from_sprite_buffer__cpu;
+wire        sprite_buffer_wre__cpu;
+wire [7:0]  input_to_sprite_buffer__cpu;
+wire [13:0] addr_to_sprite_buffer__cpu;
+/********
+mapper_ppu mapper_ppu_ins(
+    .addr_main_memory(ad_pixel_cpu_mem),
+    .din_main_memory(din_pixel_cpu_mem),
+    .dout_main_memory(dout_pixel_cpu_mem),
+    .wre_main_memory(wre_pixel_cpu_mem),
+    .addr_mapper(ad_pixel_mapper),
+    .din_mapper(din_pixel_mapper),
+    .wre_mapper(wre_pixel_mapper),
+    .dout_mapper(dout_pixel_mapper),
+    .addr_sdram_manager(addr_sdram_manager__pixel_cpu),
+    .din_sdram_manager(din_sdram_manager__pixel_cpu),
+    .dout_sdram_manager(dout_sdram_manager__pixel_cpu),
+    .wre_sdram_manager(wre_sdram_manager__pixel_cpu),
+    .addr_tile(ad_pixel___tile_memory),
+    .din_tile(din_pixel___tile_memory),
+    .dout_tile(dout_pixel___tile_memory),
+    .wre_tile(wre_pixel___tile_memory),
+    .addr___collision_stack_cpu(addr___collision_stack_cpu),
+    .input___collision_stack_cpu(input___collision_stack_cpu),
+    .out___collision_stack_cpu(out___collision_stack_cpu),
+    .wre___collision_stack_cpu(wre___collision_stack_cpu),
+    .out_from_sprite_buffer__cpu(out_from_sprite_buffer__cpu),
+    .sprite_buffer_wre__cpu(sprite_buffer_wre__cpu),
+    .input_to_sprite_buffer__cpu(input_to_sprite_buffer__cpu),
+    .addr_to_sprite_buffer__cpu(addr_to_sprite_buffer__cpu)
+);
+*********/
+wire [63:0]  cmd_to_put_in_ppu_fifo;
+wire         wr_cmd_for_ppu_fifo;
+wire         processing_the_ppu_fifo_insert;
+
+wire         ppu_cmd_fifo_is_empity;
+wire [9:0]   collision_stack_size;
+PPU ppu_ins(
+    .clk(clk),
+    .rst_n(n_reset_global),
+    .addr_sdram_manager__pixel_ppu(addr_sdram_manager__pixel_ppu),
+    .din_sdram_manager__pixel_ppu(din_sdram_manager__pixel_ppu),
+    .dout_sdram_manager__pixel_ppu(dout_sdram_manager__pixel_ppu),
+    .wre_sdram_manager__pixel_ppu(wre_sdram_manager__pixel_ppu),
+    .sdram_manager_is_processing_request_from__pixel_ppu(processing_request_from__pixel_ppu),
+    .n_32bits_words_processed_by_current_pixel_ppu_request(n_32bits_words_processed_by_current_pixel_ppu_request),
+    .cmd_to_insert_in_fifo(cmd_to_put_in_ppu_fifo),
+    .wr_cmd(wr_cmd_for_ppu_fifo),
+    .processing_insert(processing_the_ppu_fifo_insert),
+    .fifo_cmd_empty(ppu_cmd_fifo_is_empity),
+    .addr___collision_stack_cpu(addr___collision_stack_cpu),
+    .input___collision_stack_cpu(input___collision_stack_cpu),
+    .out___collision_stack_cpu(out___collision_stack_cpu),
+    .wre___collision_stack_cpu(wre___collision_stack_cpu),
+    .out_from_sprite_buffer__cpu(out_from_sprite_buffer__cpu),
+    .sprite_buffer_wre__cpu(sprite_buffer_wre__cpu),
+    .input_to_sprite_buffer__cpu(input_to_sprite_buffer__cpu),
+    .addr_to_sprite_buffer__cpu(addr_to_sprite_buffer__cpu),
+    .collision_stack_size(collision_stack_size),
+    .hdmi_ctrl_is_standby(hdmi_ctrl_is_standby),
+    .debug_signal(debug_signal),
+    .cpu_reseted(reset_cpu),
+    .cpu_enabled(enable),
+    .count_pulses_where_ppu_is_idle(count_pulses_where_ppu_is_idle)
 );
 
 
@@ -315,7 +520,7 @@ MAIN_MEMORY main_memory_inst (
     .ad(addr_main_memory[11:0]),
     .din(din_main_memory)
 );
-wire [31:0] pc;
+wire [15:0] ps2_buttons;
 mapper mapper_ins(
     .addr_main_memory(addr_main_memory),
     .din_main_memory(din_main_memory),
@@ -341,11 +546,56 @@ mapper mapper_ins(
     .din_sdram_manager(din_sdram_manager__mapper),
     .dout_sdram_manager(dout_sdram_manager__mapper),
     .wre_sdram_manager(wre_sdram_manager__mapper),
-    .debug_signal_draw(debug_signal_draw)
+    .debug_signal(debug_signal),
+
+    
+    .ad_pixel_ppu__for_mapper_of_main_cpu(ad_pixel_ppu__for_mapper_of_main_cpu),
+    .din_pixel_ppu__for_mapper_of_main_cpu(din_pixel_ppu__for_mapper_of_main_cpu),
+    .dout_pixel_ppu__for_mapper_of_main_cpu(dout_pixel_ppu__for_mapper_of_main_cpu),
+    .wre_pixel_ppu__for_mapper_of_main_cpu(wre_pixel_ppu__for_mapper_of_main_cpu),
+    .addr_tile(ad_cpu___tile_memory),
+    .din_tile(din_cpu___tile_memory),
+    .dout_tile(dout_cpu___tile_memory),
+    .wre_tile(wre_cpu___tile_memory),
+
+
+    .addr___collision_stack_cpu(addr___collision_stack_cpu),
+    .input___collision_stack_cpu(input___collision_stack_cpu),
+    .out___collision_stack_cpu(out___collision_stack_cpu),
+    .wre___collision_stack_cpu(wre___collision_stack_cpu),
+    .out_from_sprite_buffer__cpu(out_from_sprite_buffer__cpu),
+    .sprite_buffer_wre__cpu(sprite_buffer_wre__cpu),
+    .input_to_sprite_buffer__cpu(input_to_sprite_buffer__cpu),
+    .addr_to_sprite_buffer__cpu(addr_to_sprite_buffer__cpu),
+    .collision_stack_size(collision_stack_size),
+    .ps2_buttons(ps2_buttons),
+    .count_pulses_since_riscv_started(count_pulses_since_riscv_started),
+    .count_pulses_where_sdram_controller_is_idle(count_pulses_where_sdram_controller_is_idle),
+    .count_pulses_where_ppu_is_idle(count_pulses_where_ppu_is_idle)
 );
+rv32im_cpu___ppu rv32im_cpu_ppu_inst(
+    .clk(clk),
+    .reset(reset_cpu|(~lock_pll)),
+    .mem_addr___external(addr_main_memory___rv32im_cpu_inst),
+    .mem_wdata___external(din_main_memory___rv32im_cpu_inst),
+    .mem_rdata___external(dout_mapper),
+    .mem_we___external(wre_main_memory___rv32im_cpu_inst),
+    .enable(enable),
+    .cmd_to_put_in_ppu_fifo(cmd_to_put_in_ppu_fifo),
+    .wr_cmd_for_ppu_fifo(wr_cmd_for_ppu_fifo),
+    .processing_the_ppu_fifo_insert(processing_the_ppu_fifo_insert),
+    .set_addr_to_frame_buffer(set_addr_to_frame_buffer),
+    .addr_to_frame_buffer(addr_to_frame_buffer),
+    .fb_horizontal_offset(fb_horizontal_offset),
+    .set_addr_to_frame_buffer__ack(set_addr_to_frame_buffer__ack),
+    .ppu_cmd_fifo_is_empity(ppu_cmd_fifo_is_empity),
+    //.debug_signal(debug_signal),
+    .leds(led)
 
 
-rv32im_cpu___ppu rv32im_cpu_inst(
+);
+/*****
+rv32i_cpu  rv32i_cpu_inst(
     .clk(clk),
     .reset(reset_cpu|(~lock_pll)),
     .mem_addr___external(addr_main_memory___rv32im_cpu_inst),
@@ -354,8 +604,9 @@ rv32im_cpu___ppu rv32im_cpu_inst(
     .mem_we___external(wre_main_memory___rv32im_cpu_inst),
     .enable(1'b1)
 );
+******/
 
-
+/******
 control_leds control_leds_ins(
     .clk(clk),
     .addr_led_memory(addr_led_memory),
@@ -364,8 +615,7 @@ control_leds control_leds_ins(
     .wre_led_memory(wre_led_memory),
     .leds(led)
 );
-
-
+*******/
 control_cpu control_cpu_ins(
     .clk(clk),
     .rst_n(n_reset_global),
@@ -374,9 +624,34 @@ control_cpu control_cpu_ins(
     .dout_control_cpu_memory(dout_control_cpu_memory),
     .wre_control_cpu_memory(wre_control_cpu_memory),
     .reset_cpu(reset_cpu),
-    .sel___main_memory(sel___main_memory)
+    .sel___main_memory(sel___main_memory),
+    .enable_cpu(enable),
+    .spi_comm_started(spi_comm_started),
+    .spi_can_access_memory(spi_can_access_memory)
+    //.clk_out(clk_cpu)
 );
 
+
+reg ps2_dat;
+always @(posedge clk) begin
+	ps2_dat<=ds_miso;
+end
+
+
+ps2_controller controller (
+    .clk(clk),
+    .rst_n(n_reset_global),
+
+    // Interface com o controle PS2
+    .ps2_att(ds_cs),
+    .ps2_clk(ds_clk),
+    .ps2_cmd(ds_mosi),
+    .ps2_dat(ps2_dat),
+
+    .buttons(ps2_buttons)
+   // .debug_signal(debug_signal)
+
+);
 
 
 
