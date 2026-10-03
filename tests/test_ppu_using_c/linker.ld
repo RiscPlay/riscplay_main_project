@@ -2,7 +2,13 @@ ENTRY(_start)
 
 MEMORY
 {
-  RAM (rwx) : ORIGIN = 0x80000000, LENGTH = 16K
+  RAM (rwx) : ORIGIN = 0x80000000, LENGTH = 32K
+}
+
+PHDRS
+{
+  text PT_LOAD FLAGS(5); /* R + X */
+  data PT_LOAD FLAGS(6); /* R + W */
 }
 
 SECTIONS
@@ -11,31 +17,31 @@ SECTIONS
   .text : {
     *(.init)
     *(.text*)
-  } > RAM
+  } > RAM :text
 
   /* Constantes */
   .rodata : {
     *(.rodata*)
-  } > RAM
+  } > RAM :text
 
-  /* Dados já inicializados (já estarão na RAM) */
+  /* Dados inicializados */
   .data : {
     . = ALIGN(4);
     _sdata = .;
     *(.data*)
     . = ALIGN(4);
     _edata = .;
-  } > RAM
+  } > RAM :data
 
   /* Dados não inicializados */
-  .bss : {
+  .bss (NOLOAD) : {
     . = ALIGN(4);
     _sbss = .;
     *(.bss*)
     *(COMMON)
     . = ALIGN(4);
     _ebss = .;
-  } > RAM
+  } > RAM :data
 
   /* Topo da stack */
   _stack_top = ORIGIN(RAM) + LENGTH(RAM);

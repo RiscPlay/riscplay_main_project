@@ -92,7 +92,7 @@ always @(posedge clk) begin
             default: state<=STATE_START;
 
             STATE_LOAD_DATA: begin
-                if(sync__state & time_that_stage_hold>4'h1 & spi_can_access_memory) begin
+                if(sync__state & time_that_stage_hold>4'h3 & spi_can_access_memory) begin
                     four_lasts_bytes_to_send<=dout_main_memory;
                     state<=STATE_PUT_DATA_IN_FIFO;
                 end

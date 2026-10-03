@@ -110,13 +110,12 @@ void copy_sprite_from_sdram_to_buffer(uint32_t sdram_addr, uint32_t n_pixels_to_
 }
 
 
-void render_sprite(uint32_t sdram_addr, uint32_t n_pixels_to_render,uint32_t buffer_addr,uint32_t invert_render)
+void render_sprite(uint32_t sdram_addr,uint32_t width,uint32_t height,uint32_t invert_render_x,uint32_t invert_render_y)
 {
     uint32_t cmd_type= UINT32_C(0x20000000);//0x2<<28
     uint32_t rs1=cmd_type|(sdram_addr<<7);
-    if(invert_render==0) invert_render=2;
-    else invert_render=0;
-    uint32_t rs2=(buffer_addr<<18)| n_pixels_to_render<<2|invert_render;
+    uint32_t buffer_addr=0;
+    uint32_t rs2=(width<<24)|(height<<16)| (invert_render_x<<1)|(invert_render_y);
     asm volatile (
         ".insn r 0x2B, 0x0, 0x00, x0, %0, %1"
         :
@@ -126,7 +125,7 @@ void render_sprite(uint32_t sdram_addr, uint32_t n_pixels_to_render,uint32_t buf
 }
 void load_pallet_from_sdram(uint32_t sdram_addr)
 {
-    uint32_t cmd_type= UINT32_C(0x10000000);//0x3<<28
+    uint32_t cmd_type= UINT32_C(0x10000000);//0x1<<28
     uint32_t rs1=cmd_type|(sdram_addr<<7);
     uint32_t rs2=0;
     asm volatile (
@@ -142,6 +141,18 @@ void set_frame_buffer(uint32_t sdram_addr,uint32_t horizontal_offset)
     uint32_t rs2=horizontal_offset;
     asm volatile (
         ".insn r 0x2B, 0x0, 0x01, x0, %0, %1"
+        :
+        : "r"(rs1), "r"(rs2)
+        : "memory"
+    );
+}
+void set_sprite_wiwdh(uint32_t horizontal_offset)
+{
+    uint32_t cmd_type= UINT32_C(0x50000000);//0x5<<28
+    uint32_t rs1=cmd_type;
+    uint32_t rs2=horizontal_offset;
+    asm volatile (
+        ".insn r 0x2B, 0x0, 0x00, x0, %0, %1"
         :
         : "r"(rs1), "r"(rs2)
         : "memory"

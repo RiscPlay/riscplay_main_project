@@ -1,4 +1,4 @@
-module TestPattern
+module Pixel_Generator
 (
 	input              I_pxl_clk   ,//pixel clock
     input              I_rst_n     ,//low active 
@@ -35,6 +35,30 @@ module TestPattern
     input  wire [6:0]  n_32bits_words_processed_by_current_hdmi_request,
     output reg         hdmi_ctrl_is_standby
 ); 
+`define  __LOW_RESOLUTION__
+
+`ifndef __LOW_RESOLUTION__
+`define __N_COLS_for_11_bits__ 11'd640
+`define __N_COLS_for_21_bits__ 21'd640
+`define __N_COLS_MINUS_1_for_11_bits__ 11'd639
+`define __N_COLS_MINUS_1_for_12_bits__ 12'd639
+`define __N_COLS_MINUS_3_for_12_bits__ 12'd637
+
+`define __N_COLS_DOT_TWO_MINUS_1_for_11_bits__  11'd1279
+`define __N_ROWS_MINUS_1_for_12_bits__  12'd359
+
+
+
+`else
+`define __N_COLS_for_11_bits__ 11'd320
+`define __N_COLS_for_21_bits__ 21'd320
+`define __N_COLS_MINUS_1_for_11_bits__ 11'd319
+`define __N_COLS_MINUS_1_for_12_bits__ 12'd319
+`define __N_COLS_DOT_TWO_MINUS_1_for_11_bits__  11'd639
+`define __N_ROWS_MINUS_1_for_12_bits__  12'd179
+`define __N_COLS_MINUS_3_for_12_bits__ 12'd317
+
+`endif 
 
 localparam N = 5;
 reg  [11:0]   V_cnt     ;
@@ -213,7 +237,7 @@ always @(posedge I_pxl_clk ) begin
             wating_set_framebuffer<=1'b1;
         end
         else if(wating_set_framebuffer) begin
-            if(n_line_being_obtained == 12'd359 && st_rd_img_lines==ST_RD_IMG_LINES___INC_BUFFER_POINT_TO_WR && n_32bits_word_being_obtained_from_the_line == 12'd637) begin
+            if(n_line_being_obtained == `__N_ROWS_MINUS_1_for_12_bits__ && st_rd_img_lines==ST_RD_IMG_LINES___INC_BUFFER_POINT_TO_WR && n_32bits_word_being_obtained_from_the_line == `__N_COLS_MINUS_3_for_12_bits__) begin
                 //fb_horizontal_offset<=fb_horizontal_offset__input;
                 next_addr_to_first_line_of_fb_in_sdram<=addr_to_frame_buffer;
                 set_addr_to_frame_buffer__ack<=1'b1;
@@ -270,7 +294,7 @@ reg [10:0] end_write_buffer_latch;
 reg first_ite;
 always @(posedge I_pxl_clk ) begin
     if(!rst_n_paint) begin
-        pointer_to_get_next_64_32bits_words         <= 21'd640;
+        pointer_to_get_next_64_32bits_words         <= `__N_COLS_for_21_bits__;
         n_line_being_obtained                       <= 12'd1;
         addr_sdram_manager__hdmi_controller         <= 22'b1000000000000000000000;
         n_32bits_word_being_obtained_from_the_line  <= 12'h000;
@@ -285,7 +309,7 @@ always @(posedge I_pxl_clk ) begin
         get_buffer_op_accept                        <= 1'b0;
         res___get_buffer                            <= 1'b0;
         begin_write_buffer_latch                    <= 11'b0;
-        end_write_buffer_latch                      <= 11'd639;
+        end_write_buffer_latch                      <= `__N_COLS_MINUS_1_for_11_bits__;
         first_ite<=1'b1;
         reset__get_buffer_op_accept                <=  1'b0;
     end
@@ -313,11 +337,11 @@ always @(posedge I_pxl_clk ) begin
                 if(get_buffer_op_accept || n_32bits_word_being_obtained_from_the_line > 12'h000 || first_ite) begin
                     if(get_buffer_op_accept) begin
                         begin_write_buffer_latch <= begin_write_buffer;
-                        if(begin_write_buffer == 11'd640) begin
-                            end_write_buffer_latch <= 11'd1279;
+                        if(begin_write_buffer == `__N_COLS_for_11_bits__) begin
+                            end_write_buffer_latch <= `__N_COLS_DOT_TWO_MINUS_1_for_11_bits__;
                         end
                         else begin
-                            end_write_buffer_latch <= 11'd639;
+                            end_write_buffer_latch <= `__N_COLS_MINUS_1_for_11_bits__;
                         end
                         
                         ad_buffer_write <= begin_write_buffer;
@@ -375,12 +399,12 @@ always @(posedge I_pxl_clk ) begin
                 end
 
                 // 2. Avalia o encerramento baseado no contador de palavras da linha atual
-                if (n_32bits_word_being_obtained_from_the_line == 12'd639) begin
+                if (n_32bits_word_being_obtained_from_the_line == `__N_COLS_MINUS_1_for_12_bits__) begin
                     pointer_to_get_next_64_32bits_words<=pointer_to_get_next_64_32bits_words+fb_horizontal_offset;
                     n_32bits_word_being_obtained_from_the_line <= 12'h000;
                     st_rd_img_lines <= ST_RD_IMG_LINES___IDLE;
                     
-                    if(n_line_being_obtained == 12'd359) begin
+                    if(n_line_being_obtained == `__N_ROWS_MINUS_1_for_12_bits__) begin
                         n_line_being_obtained <= 12'h000;
                         addr_to_first_line_of_fb_in_sdram          <= next_addr_to_first_line_of_fb_in_sdram;
                     end
@@ -428,7 +452,7 @@ begin
 		count_debug<=32'h00000000;
 		count_debug_2<=4'h0;
 		count_rows<=12'd0;
-		ad_buffer_read<=11'd640;
+		ad_buffer_read<=`__N_COLS_for_11_bits__;
 		begin_write_buffer<=11'd0;
 		line<=4'h0;
 		get_buffer<=1'b0;
@@ -438,18 +462,33 @@ begin
 		De_hcnt_d2<=De_hcnt_d1;
 		V_cnt_prev<=V_cnt;
 		if(De_neg) begin
+            `ifndef __LOW_RESOLUTION__
 			if(line==4'h3)
 				line<=4'h0;
 			else 
 				line<=line+4'h1;
 			if(line==4'h1) begin
 				get_buffer<=1'b1;
-				begin_write_buffer<=11'd640;
+				begin_write_buffer<=`__N_COLS_for_11_bits__;
 			end
 			else if(line==4'h3) begin
 				begin_write_buffer<=11'd0;
 				get_buffer<=1'b1;
 			end
+            `else
+            if(line==4'h7)
+				line<=4'h0;
+			else 
+				line<=line+4'h1;
+			if(line==4'h3) begin
+				get_buffer<=1'b1;
+				begin_write_buffer<=`__N_COLS_for_11_bits__;
+			end
+			else if(line==4'h7) begin
+				begin_write_buffer<=11'd0;
+				get_buffer<=1'b1;
+			end
+            `endif
 		end
 		else begin
 			if(res___get_buffer) begin
@@ -460,21 +499,40 @@ begin
 		if(Pout_de_dn[2]==1'b0) begin
 			count_rows<=12'h000;
 			Data_tmp <= 24'h000000;
+            `ifndef __LOW_RESOLUTION__
+
 			if(line==4'h0 || line==4'h1) begin
-				ad_buffer_read<=11'd640;
+				ad_buffer_read<=`__N_COLS_for_11_bits__;
 			end
 			else begin
 				ad_buffer_read<=11'd0;
 			end
+            `else
+			if(line<=4'h3) begin
+				ad_buffer_read<=`__N_COLS_for_11_bits__;
+			end
+			else begin
+				ad_buffer_read<=11'd0;
+			end
+            `endif
 		end
 		else  begin
-			count_rows<=count_rows+12'h001;
+            count_rows<=count_rows+12'h001;
+            `ifndef __LOW_RESOLUTION__
 			if(count_rows[0]==1'b1) begin
 				ad_buffer_read<=ad_buffer_read+11'b1;
 			end
-			else begin
+            else begin
                 Data_tmp<=dout_buffer[23:0];
             end
+            `else
+            if(count_rows[1:0]==2'b11) begin
+				ad_buffer_read<=ad_buffer_read+11'b1;
+			end
+            else begin
+                Data_tmp<=dout_buffer[23:0];
+            end
+            `endif
 		end
 	end
 end
@@ -517,7 +575,7 @@ always @(posedge I_pxl_clk) begin
         hdmi_ctrl_is_standby<=1'b1;
     end
     else begin
-        hdmi_ctrl_is_standby<=1'b0;
+        hdmi_ctrl_is_standby<=1'b1;
     end
 end
 

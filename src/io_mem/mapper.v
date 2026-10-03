@@ -1,5 +1,6 @@
 module mapper(
-    output wire [11:0] addr_main_memory,
+    input  wire        clk,
+    output wire [12:0] addr_main_memory,
     output wire [31:0] din_main_memory,
     input  wire [31:0] dout_main_memory,
     output wire        wre_main_memory,
@@ -27,10 +28,6 @@ module mapper(
     output  wire        wre_pixel_ppu__for_mapper_of_main_cpu,
 
 
-    output wire [13:0]  addr_tile,
-    output wire [7:0]   din_tile,
-    input  wire [7:0]   dout_tile,
-    output wire         wre_tile,
 
 
     input  wire [7:0]  out_from_sprite_buffer__cpu,
@@ -66,7 +63,6 @@ module mapper(
 
 wire sel_main     = addr_mapper[31:29]==3'b001;
 wire sel_sdram    = addr_mapper[31:28]==4'b1;
-wire sel_tile     = addr_mapper[31:27]==5'b1;
 
 //wire sel_ppu     = ~sel_main && addr_mapper[24];
 
@@ -86,7 +82,7 @@ wire sel_debug               = addr_mapper[31:25]==7'b0 && addr_mapper[8]==1'b0 
 //
 // MAIN MEMORY
 //
-assign addr_main_memory = addr_mapper[11:0];
+assign addr_main_memory = addr_mapper[12:0];
 assign din_main_memory  = din_mapper;
 assign wre_main_memory  = sel_main ? wre_mapper : 1'b0;
 
@@ -108,18 +104,7 @@ assign din_sdram_manager  = din_mapper;
 assign wre_sdram_manager  = sel_sdram ? wre_mapper : 1'b0;
 
 
-assign addr_tile = addr_mapper[13:0];
-assign din_tile  = din_mapper[31:24] ;
-assign wre_tile   = sel_tile ? wre_mapper : 1'b0;
 
-
-
-//
-// PPU MEMORY
-//
-////assign ad_pixel_ppu__for_mapper_of_main_cpu = addr_mapper[11:0];
-////assign din_pixel_ppu__for_mapper_of_main_cpu = din_mapper;
-////assign wre_pixel_ppu__for_mapper_of_main_cpu = sel_ppu ? wre_mapper : 1'b0;
 
 
 
@@ -138,20 +123,27 @@ assign dout_mapper =
     sel_main                   ? dout_main_memory :
     sel_control                ? dout_control_cpu_memory :
     sel_sdram                  ? dout_sdram_manager :
-    //sel_tile                   ? {dout_tile,24'h0} :
-    sel_debug                  ? debug_signal :
     sel_colision               ? {out___collision_stack_cpu,16'h0} :
-   // sel_sprite                 ? {out_from_sprite_buffer__cpu,24'h0} :
     sel_col_size               ? {collision_stack_size,22'b0}:
     sel_ps2_buttons            ? {16'h0,ps2_buttons}:
-    //sel_count_pulses_cpu_p1    ? count_pulses_since_riscv_started[63:32] :
-    //sel_count_pulses_cpu_p2    ? count_pulses_since_riscv_started[31:0]  :
-    //sel_count_pulses_ppu_p1    ? count_pulses_where_ppu_is_idle[63:32]   :
-    //sel_count_pulses_ppu_p2    ? count_pulses_where_ppu_is_idle[31:0]    :
-    //sel_count_pulses_ram_p1    ? count_pulses_where_sdram_controller_is_idle[63:32]    :
-    sel_count_pulses_ram_p2    ? count_pulses_where_sdram_controller_is_idle[31:0]     :
+    data_out_buffer;
 
-    32'h00000000;
-
+reg [31:0] data_out_buffer;
+always @(posedge clk) begin
+   if(sel_count_pulses_cpu_p1)
+        data_out_buffer<=count_pulses_since_riscv_started[63:32];
+    else if(sel_count_pulses_cpu_p2)
+        data_out_buffer<=count_pulses_since_riscv_started[31:0];
+    else if(sel_count_pulses_ppu_p1)
+        data_out_buffer<=count_pulses_where_ppu_is_idle[63:32];
+    else if(sel_count_pulses_ppu_p2)
+        data_out_buffer<=count_pulses_where_ppu_is_idle[31:0];
+    else if(sel_count_pulses_ram_p1)
+        data_out_buffer<=count_pulses_where_sdram_controller_is_idle[63:32];
+    else if(sel_count_pulses_ram_p2)
+        data_out_buffer<=count_pulses_where_sdram_controller_is_idle[31:0];
+    else
+        data_out_buffer <=32'h0;
+end
 
 endmodule

@@ -69,8 +69,7 @@ always @(posedge pix_clk ) begin
     end
 end
 //===========================================================================
-//testpattern
-TestPattern testpattern_inst
+Pixel_Generator Pixel_Generator_inst
 (
     .I_pxl_clk   (pix_clk            ),//pixel clock
     .I_rst_n     (hdmi4_rst_n        ),//low active 

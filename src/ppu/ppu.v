@@ -28,7 +28,12 @@ module PPU(
     input   wire        cpu_enabled
 
 );
-
+`define  __LOW_RESOLUTION__
+`ifndef __LOW_RESOLUTION__
+    `define __N_PIXELS_IN_FRAME_BUFFER 20'd230400
+`else
+    `define __N_PIXELS_IN_FRAME_BUFFER 20'd57600
+`endif
 wire [63:0] cmd_to_process;
 reg pop_signal;
 wire processing_pop;
@@ -118,9 +123,15 @@ wire [6:0]  sprit_id=cmd_to_process[38:32];
 wire [31:0] color_argb_to_paint=cmd_to_process[31:0];
 wire [13:0] start_addr_of_sprite_buffer=cmd_to_process[31:18];
 wire [15:0] length_sprite_buffer=cmd_to_process[17:2];
-wire increment_addr_during_render=cmd_to_process[1]; 
+wire [7:0] current_sprite_width=cmd_to_process[31:24];
+wire [7:0] current_sprite_height=cmd_to_process[23:16];
+
+wire inv_x_during_render=cmd_to_process[1]; 
+wire inv_y_during_render=cmd_to_process[0]; 
 
 reg  [31:0] pallet [0:255];
+reg  [15:0] current_sprite_width__latch;
+reg  [15:0] current_sprite_height__latch;
 
 localparam cmd_type__load_pallet  = 4'h0;
 
@@ -185,7 +196,7 @@ always @(posedge clk) begin
     if(cpu_reseted) begin
         count_pulses_where_ppu_is_idle<=64'h0;
     end
-    else if(state==STATE_IDLE_P0 || state==STATE_IDLE_P1) begin
+    else if(fifo_cmd_empty) begin
         if(cpu_enabled)
             count_pulses_where_ppu_is_idle<=count_pulses_where_ppu_is_idle+64'h1;
     end
@@ -196,6 +207,8 @@ localparam CMD_TYPE__DATA_FROM_SDRAM_TO_PALLET  = 4'h1;
 localparam CMD_TYPE__RENDER_SPRITE = 4'h2;
 localparam CMD_TYPE__CLEAN_FRAME_BUFFER = 4'h3;
 localparam CMD_TYPE__CLEAN_COLISION_STACK=4'h4;
+localparam CMD_TYPE__SET_CURRENT_SPRITE_WIDTH=4'h5;
+
 reg [7:0]  pointer_to_write_in_pallet;
 reg [6:0]  pointer_to_write_in_sdram;
 reg [19:0] n_pixel_wrote_in_sdram;
@@ -204,10 +217,14 @@ reg [19:0] n_pixel_send_to_write_in_sdram;
 reg [21:0] pointer_to_get_data_from_sdram;
 reg [20:0] addr_sdram;
 reg [20:0] addr_sdram_prev;
+reg [20:0] addr_sdram_to_start_current_line;
 reg [15:0] n_bytes_stored_in_sprite_buffer;
 reg [15:0] n_pixels_stored_in_sdram;
 reg [1:0]  pointer_get_byte_from__dout_sdram;
 reg collision_happened;
+reg [7:0] n_pixels_written_to_frame_buffer_line;
+reg [20:0] last_n_pixels_written_to_sdram;
+reg [15:0] length_sprite_buffer__latch;
 always @(posedge clk) begin
     if(!rst_n) begin
         for (i2 = 0; i2 < 256; i2 = i2 + 1) begin
@@ -227,6 +244,7 @@ always @(posedge clk) begin
         collision_happened<=1'b0;
         waiting_cmd<=1'b0;
         debug_signal<=32'hf0000000;
+        length_sprite_buffer__latch<=16'h0;
     end
     else begin
         //debug_signal[14:8]<=n_32bits_words_processed_by_current_pixel_ppu_request;
@@ -256,9 +274,19 @@ always @(posedge clk) begin
                         CMD_TYPE__RENDER_SPRITE: begin
                             state<=STATE_RENDER_SPRITE_TO_SDRAM_P0;
                             addr_sdram<=addr_sdram_to_start;
-                            addr_to_sprite_buffer<=start_addr_of_sprite_buffer;
+                            if(inv_y_during_render) begin
+                                addr_to_sprite_buffer<=((current_sprite_width*current_sprite_height)-current_sprite_width);
+                            end
+                            else if(inv_x_during_render) begin
+                                addr_to_sprite_buffer<=(current_sprite_width)-16'h1;
+                            end
+                            else begin
+                                addr_to_sprite_buffer<=14'h0;
+                            end
+                            addr_sdram_to_start_current_line<=addr_sdram_to_start;
                             n_pixels_stored_in_sdram<=16'h0000;
                             input___collision_stack_ppu<=16'h0000;
+                            n_pixels_written_to_frame_buffer_line<=8'h00;
                         end
                         CMD_TYPE__DATA_FROM_SDRAM_TO_PALLET: begin
                             state<=STATE_SDRAM_TO_PALLET_P0;
@@ -272,10 +300,14 @@ always @(posedge clk) begin
                             addr_sdram_manager__pixel_ppu<=22'h0;
                             pointer_to_write_in_sdram<=7'b0000000;
                             n_pixel_wrote_in_sdram<=20'h000;
-                            n_pixel_send_to_write_in_sdram<=20'h000;
                         end
                         CMD_TYPE__CLEAN_COLISION_STACK: begin
                             state<=STATE_CLEAN_COLISION_STACK;
+                        end
+                        CMD_TYPE__SET_CURRENT_SPRITE_WIDTH: begin
+                            current_sprite_width__latch[7:0]<=current_sprite_width;
+                            current_sprite_height__latch[7:0]<=current_sprite_height;
+                            state<=STATE_IDLE_P0;
                         end
                     endcase
                 end
@@ -316,7 +348,7 @@ always @(posedge clk) begin
                 if(sync__state && time_that_stage_hold>8'h04) begin
                     wre_sdram_manager__pixel_ppu<=1'b0;
                     if( sdram_manager_is_processing_request_from__pixel_ppu==1'b0) begin
-                        if(n_pixel_wrote_in_sdram!=20'd230400) begin
+                        if(n_pixel_wrote_in_sdram!=`__N_PIXELS_IN_FRAME_BUFFER) begin
                             addr_sdram<=addr_sdram+20'd64;
                             state<=STATE_CLEAN_FB_P2;
                         end
@@ -327,6 +359,7 @@ always @(posedge clk) begin
                 end
             end
             STATE_SDRAM_TO_BUFFER_P0: begin
+                length_sprite_buffer__latch<=length_sprite_buffer;
                 din_sdram_manager__pixel_ppu <= {2'b00, addr_sdram, 7'b1000000, 2'b00};
                 addr_sdram_manager__pixel_ppu<= 22'b1000000000000000000000;
                 wre_sdram_manager__pixel_ppu<=1'b1;
@@ -379,7 +412,7 @@ always @(posedge clk) begin
                     sprite_buffer_wre<=1'b0;
 
                     addr_to_sprite_buffer<=addr_to_sprite_buffer+14'h1;
-                    if(n_bytes_stored_in_sprite_buffer==length_sprite_buffer) begin
+                    if(n_bytes_stored_in_sprite_buffer==length_sprite_buffer__latch) begin
                         state<=STATE_IDLE_P0;
                     end
                     else if(pointer_get_byte_from__dout_sdram==2'b00) begin
@@ -401,7 +434,7 @@ always @(posedge clk) begin
                 if(sync__state && time_that_stage_hold>8'h01) begin
                     wre_sdram_manager__pixel_ppu<=1'b0;
                 end
-                if(sync__state && time_that_stage_hold> 8'h02) begin
+                if(sync__state && time_that_stage_hold> 8'h04) begin
                     if(sdram_manager_is_processing_request_from__pixel_ppu==1'b1) begin
                         state<=STATE_RENDER_SPRITE_TO_SDRAM_P2;
                         pointer_to_get_data_from_sdram<=22'h0;
@@ -409,7 +442,7 @@ always @(posedge clk) begin
                 end
             end
             STATE_RENDER_SPRITE_TO_SDRAM_P2: begin
-                if(pointer_to_get_data_from_sdram[6:0]<n_32bits_words_processed_by_current_pixel_ppu_request) begin
+                if((pointer_to_get_data_from_sdram[6:0]+7'b1)<n_32bits_words_processed_by_current_pixel_ppu_request || sdram_manager_is_processing_request_from__pixel_ppu==1'b0) begin
                     addr_sdram_manager__pixel_ppu<=pointer_to_get_data_from_sdram;
                     pointer_to_get_data_from_sdram<=pointer_to_get_data_from_sdram+22'h1;
                     state<=STATE_RENDER_SPRITE_TO_SDRAM_P3;
@@ -419,9 +452,11 @@ always @(posedge clk) begin
             STATE_RENDER_SPRITE_TO_SDRAM_P3: begin
                 if(sync__state) begin
                     addr_sdram<=addr_sdram+21'h1;
+                    n_pixels_written_to_frame_buffer_line<=n_pixels_written_to_frame_buffer_line+8'h01;
                     addr_sdram_manager__pixel_ppu[21:13]<=9'b100000001;
-                    if(n_pixels_stored_in_sdram<length_sprite_buffer)  begin
+                    if(n_pixels_stored_in_sdram<length_sprite_buffer__latch)  begin
                         if(dout_sdram_manager__pixel_ppu[30:24]!=7'b0000000) begin
+                            `ifdef ___COLISSION___ 
                             if(input___collision_stack_ppu[15:8]!=dout_sdram_manager__pixel_ppu[31:24] || input___collision_stack_ppu[6:0]!=sprit_id) begin
                                 if(out_from_sprite_buffer==8'hff) begin
                                     input___collision_stack_ppu<={dout_sdram_manager__pixel_ppu[31:24],1'b1,sprit_id};
@@ -432,7 +467,9 @@ always @(posedge clk) begin
                                 wre___collision_stack_ppu<=1'b1;
                                 collision_happened<=1'b1;
                             end
+
                             else collision_happened<=1'b0;
+                            `endif
                         end
                         if(out_from_sprite_buffer==8'hff) begin
                             din_sdram_manager__pixel_ppu<={1'b1,sprit_id,dout_sdram_manager__pixel_ppu[23:0]};
@@ -445,7 +482,6 @@ always @(posedge clk) begin
                         din_sdram_manager__pixel_ppu<=dout_sdram_manager__pixel_ppu;
                     end
                     wre_sdram_manager__pixel_ppu<=1'b1;
-
                     state<=STATE_RENDER_SPRITE_TO_SDRAM_P4;
                 end
             end
@@ -454,40 +490,72 @@ always @(posedge clk) begin
                 wre_sdram_manager__pixel_ppu<=1'b0;
 
                 if(sync__state) begin 
-                    if(pointer_to_get_data_from_sdram[6:0]==7'b1000000) begin
+                    if(
+                        pointer_to_get_data_from_sdram[6:0]==7'b1000000 || (n_pixels_stored_in_sdram==length_sprite_buffer__latch) ||
+                        (n_pixels_written_to_frame_buffer_line==current_sprite_width)
+                    ) begin
                         if(sdram_manager_is_processing_request_from__pixel_ppu==1'b0) begin
-                            din_sdram_manager__pixel_ppu <= {2'b00, addr_sdram_prev, 7'b1000000, 2'b01};
+                            din_sdram_manager__pixel_ppu <= {2'b00, addr_sdram_prev, pointer_to_get_data_from_sdram[6:0], 2'b01};
                             addr_sdram_manager__pixel_ppu<= 22'b1000000000000000000000;
                             wre_sdram_manager__pixel_ppu<=1'b1;
+                            last_n_pixels_written_to_sdram[6:0]<=pointer_to_get_data_from_sdram[6:0];
                             state<=STATE_RENDER_SPRITE_TO_SDRAM_P5;
                         end
                     end
                     else begin 
                         state<=STATE_RENDER_SPRITE_TO_SDRAM_P2;
+                    end                    
+                end
+                else begin
+                    if(n_pixels_written_to_frame_buffer_line<current_sprite_width || (inv_y_during_render==1'b0 && inv_x_during_render==1'b0)) begin
+                        if(inv_x_during_render==1'b0) begin
+                            addr_to_sprite_buffer<=addr_to_sprite_buffer+14'b1;
+                        end
+                        else begin
+                            addr_to_sprite_buffer<=addr_to_sprite_buffer-14'b1;
+                        end
+                    end
+                    else begin
+                        if(inv_y_during_render) begin
+                            addr_to_sprite_buffer<=addr_to_sprite_buffer-(current_sprite_width<<1)+16'h1;
+                        end
+                        else if(inv_x_during_render) begin
+                            addr_to_sprite_buffer<=n_pixels_stored_in_sdram;
+                        end
+                        
+                        
                     end
                    
                     if(collision_happened) begin
                         addr___collision_stack_ppu<=addr___collision_stack_ppu+10'b0000000001;
                     end
-                    if(n_pixels_stored_in_sdram<length_sprite_buffer) 
+                    if(n_pixels_stored_in_sdram<length_sprite_buffer__latch) 
                         n_pixels_stored_in_sdram<=n_pixels_stored_in_sdram+16'h0001;
-                end
-                else begin
-                    if(increment_addr_during_render) begin
-                        addr_to_sprite_buffer<=addr_to_sprite_buffer+14'b1;
-                    end
-                    else begin
-                        addr_to_sprite_buffer<=addr_to_sprite_buffer-14'b1;
-                    end
                 end
             end
             STATE_RENDER_SPRITE_TO_SDRAM_P5: begin
+                if(sync__state==1'b0) begin
+                    if(n_pixels_written_to_frame_buffer_line==current_sprite_width) begin
+                        n_pixels_written_to_frame_buffer_line<=8'h00;
+                        `ifndef __LOW_RESOLUTION__
+                        addr_sdram<=addr_sdram_to_start_current_line+21'd640;
+                        addr_sdram_to_start_current_line<=addr_sdram_to_start_current_line+21'd640;
+                        `else 
+                        addr_sdram<=addr_sdram_to_start_current_line+21'd320;
+                        addr_sdram_to_start_current_line<=addr_sdram_to_start_current_line+21'd320;
+                        `endif
+                    end
+                    else begin
+                        addr_sdram<=addr_sdram_prev+last_n_pixels_written_to_sdram;
+                    end
+                end
                 if(sync__state && time_that_stage_hold>8'h01) begin
                     wre_sdram_manager__pixel_ppu<=1'b0;
+                    
                 end
                 if(sync__state && time_that_stage_hold> 8'h04) begin
                     if(sdram_manager_is_processing_request_from__pixel_ppu==1'b0) begin
-                        if(n_pixels_stored_in_sdram<length_sprite_buffer)
+                        if(n_pixels_stored_in_sdram<length_sprite_buffer__latch)
                             state<=STATE_RENDER_SPRITE_TO_SDRAM_P0;
                         else begin
                             state <= STATE_IDLE_P0;

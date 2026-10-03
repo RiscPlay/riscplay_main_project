@@ -197,7 +197,11 @@ module rv32im_cpu___ppu(
     .busy(busy____qdiv32),
     .done(done____qdiv32)
   );
-
+  reg          wr_en__fb;
+  reg  [20:0]  wr_data__fb;
+  wire         processing_insert__fb;
+  wire         full__fb;
+  wire         near_to_be_full__fb;
   always @(posedge clk) begin
     if(reset) begin
       pc <= 32'h80000000;
@@ -218,6 +222,8 @@ module rv32im_cpu___ppu(
           regfile[i] <= 32'h0;
       end
       debug_signal<=32'h00000000;
+      wr_en__fb<=1'b0;
+      wr_data__fb<=21'h0;
 
     end
 
@@ -483,5 +489,66 @@ module rv32im_cpu___ppu(
     end
 
   end
+
+
+/************
+reg          rd_en;
+wire [20:0]  rd_data;
+wire         empty;
+wire         processing_pop;
+Fifo_Frame_Buffer fifo_Frame_Buffer__ins(
+  .clk(clk),
+  .rst_n(!reset),
+  .wr_en(wr_en__fb),
+  .wr_data(wr_data__fb),
+  .rd_en(rd_en),
+  .empty(empty),
+  .full(full__fb),
+  .processing_insert(processing_insert__fb),
+  .processing_pop(processing_pop),
+  .near_to_be_full(near_to_be_full__fb)
+);
+reg [3:0] fb_state;
+always @(posedge clk) begin
+    if(reset) begin
+      fb_state<=4'h0;
+      rd_en<=1'b0;
+    end
+    else begin
+      case(fb_state) 
+        default: fb_state<=4'h0;
+        4'h0: begin 
+          if(!empty) begin
+            rd_en<=1'b1;
+            fb_state<= 4'h1;
+          end
+        end
+        4'h1: begin
+          fb_state<= 4'h2;
+          rd_en<=1'b0;
+        end
+        4'h2: begin
+          if(processing_pop==1'b0) begin
+            addr_to_frame_buffer<=rd_data;
+            set_addr_to_frame_buffer<=1'b1;
+            fb_state<= 4'h3;
+          end
+        end
+        4'h3: begin
+          fb_state<= 4'h4;
+        end
+        4'h4: begin
+          fb_state<= 4'h5;
+        end
+        4'h5: begin
+          set_addr_to_frame_buffer<=1'b0;
+          if(set_addr_to_frame_buffer__ack) begin
+            fb_state<=4'h0;
+          end
+        end
+      endcase
+    end
+end
+************/
 
 endmodule

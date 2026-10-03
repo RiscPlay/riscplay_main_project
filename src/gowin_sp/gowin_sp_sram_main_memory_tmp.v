@@ -5,7 +5,7 @@
 //Part Number: GW2AR-LV18QN88C8/I7
 //Device: GW2AR-18
 //Device Version: C
-//Created Time: Tue Apr 21 01:30:58 2026
+//Created Time: Tue Sep 22 18:00:59 2026
 
 //Change the instance name and port connections to the signal names
 //--------Copy here to design--------
@@ -17,7 +17,7 @@
         .ce(ce), //input ce
         .reset(reset), //input reset
         .wre(wre), //input wre
-        .ad(ad), //input [11:0] ad
+        .ad(ad), //input [12:0] ad
         .din(din) //input [31:0] din
     );
 

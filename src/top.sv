@@ -300,10 +300,6 @@ sdram_manager sdram_manager__ins(
 
 wire [3:0] sel___main_memory;
 
-wire wre_main_memory;
-wire [11:0] addr_main_memory;
-wire [31:0] din_main_memory;
-wire [31:0] dout_main_memory;
 
 
 wire wre_mapper;
@@ -370,73 +366,10 @@ spi spi_ins (
 );
 
 
-wire [31:0] dout_pixel_cpu_mem;
-wire [31:0] din_pixel_cpu_mem;
-wire        wre_pixel_cpu_mem;
-wire [11:0] ad_pixel_cpu_mem;
 
 
-wire [31:0] dout_pixel_mapper;
-wire [31:0] din_pixel_mapper;
-wire        wre_pixel_mapper;
-wire [31:0] ad_pixel_mapper;
 
-wire [11:0] ad_pixel_ppu__for_mapper_of_main_cpu;
-wire [31:0] din_pixel_ppu__for_mapper_of_main_cpu;
-wire [31:0] dout_pixel_ppu__for_mapper_of_main_cpu;
-wire        wre_pixel_ppu__for_mapper_of_main_cpu;
-/********
-Gowin_DPB__CPU_PIXEL_MEMORY memory_pixel_cpu (
-    .ada(ad_pixel_cpu_mem),
-    .dina(din_pixel_cpu_mem),
-    .douta(dout_pixel_cpu_mem),
-	.wrea(wre_pixel_cpu_mem),
 
-    .adb(ad_pixel_ppu__for_mapper_of_main_cpu),
-	.dinb(din_pixel_ppu__for_mapper_of_main_cpu),
-    .doutb(dout_pixel_ppu__for_mapper_of_main_cpu),
-    .wreb(wre_pixel_ppu__for_mapper_of_main_cpu),
-
-    .ocea(1'b1),
-    .cea(1'b1),
-    .reseta(1'b0),
-    .oceb(1'b1),
-    .ceb(1'b1),
-    .resetb(1'b0),
-    .clka(clk),
-    .clkb(clk)
-);
-**********/
-wire [13:0] ad_pixel___tile_memory;
-wire [7:0]  dout_pixel___tile_memory;
-wire [7:0]  din_pixel___tile_memory;
-wire        wre_pixel___tile_memory;
-
-wire [13:0] ad_cpu___tile_memory;
-wire [7:0]  dout_cpu___tile_memory;
-wire [7:0]  din_cpu___tile_memory;
-wire        wre_cpu___tile_memory;
-Gowin_DPB_Tile tile_memory(
-        .clka(clk), //input clka
-        .ada(ad_pixel___tile_memory), //input [13:0] ada
-        .douta(dout_pixel___tile_memory), //output [7:0] douta
-        .dina(din_pixel___tile_memory), //input [7:0] dina
-        .wrea(wre_pixel___tile_memory), //input wrea
-
-        .clkb(clk), //input clkb
-        .adb(ad_cpu___tile_memory), //input [13:0] adb
-        .doutb(dout_cpu___tile_memory), //output [7:0] doutb
-        .dinb(din_cpu___tile_memory), //input [7:0] dinb
-        .wreb(wre_cpu___tile_memory), //input wreb
-
-        .ocea(1'b1), //input ocea
-        .cea(1'b1), //input cea
-        .reseta(1'b0), //input reseta
-        .oceb(1'b1), //input oceb
-        .ceb(1'b1), //input ceb
-        .resetb(1'b0) //input resetb
-    
-);
 wire [15:0] out___collision_stack_cpu;
 wire        wre___collision_stack_cpu;
 wire [15:0] input___collision_stack_cpu;
@@ -446,34 +379,8 @@ wire [7:0]  out_from_sprite_buffer__cpu;
 wire        sprite_buffer_wre__cpu;
 wire [7:0]  input_to_sprite_buffer__cpu;
 wire [13:0] addr_to_sprite_buffer__cpu;
-/********
-mapper_ppu mapper_ppu_ins(
-    .addr_main_memory(ad_pixel_cpu_mem),
-    .din_main_memory(din_pixel_cpu_mem),
-    .dout_main_memory(dout_pixel_cpu_mem),
-    .wre_main_memory(wre_pixel_cpu_mem),
-    .addr_mapper(ad_pixel_mapper),
-    .din_mapper(din_pixel_mapper),
-    .wre_mapper(wre_pixel_mapper),
-    .dout_mapper(dout_pixel_mapper),
-    .addr_sdram_manager(addr_sdram_manager__pixel_cpu),
-    .din_sdram_manager(din_sdram_manager__pixel_cpu),
-    .dout_sdram_manager(dout_sdram_manager__pixel_cpu),
-    .wre_sdram_manager(wre_sdram_manager__pixel_cpu),
-    .addr_tile(ad_pixel___tile_memory),
-    .din_tile(din_pixel___tile_memory),
-    .dout_tile(dout_pixel___tile_memory),
-    .wre_tile(wre_pixel___tile_memory),
-    .addr___collision_stack_cpu(addr___collision_stack_cpu),
-    .input___collision_stack_cpu(input___collision_stack_cpu),
-    .out___collision_stack_cpu(out___collision_stack_cpu),
-    .wre___collision_stack_cpu(wre___collision_stack_cpu),
-    .out_from_sprite_buffer__cpu(out_from_sprite_buffer__cpu),
-    .sprite_buffer_wre__cpu(sprite_buffer_wre__cpu),
-    .input_to_sprite_buffer__cpu(input_to_sprite_buffer__cpu),
-    .addr_to_sprite_buffer__cpu(addr_to_sprite_buffer__cpu)
-);
-*********/
+
+
 wire [63:0]  cmd_to_put_in_ppu_fifo;
 wire         wr_cmd_for_ppu_fifo;
 wire         processing_the_ppu_fifo_insert;
@@ -508,6 +415,10 @@ PPU ppu_ins(
     .cpu_enabled(enable),
     .count_pulses_where_ppu_is_idle(count_pulses_where_ppu_is_idle)
 );
+wire wre_main_memory;
+wire [12:0] addr_main_memory;
+wire [31:0] din_main_memory;
+wire [31:0] dout_main_memory;
 
 
 MAIN_MEMORY main_memory_inst (
@@ -517,11 +428,12 @@ MAIN_MEMORY main_memory_inst (
     .ce(1'b1),
     .reset(1'b0),
     .wre(wre_main_memory),
-    .ad(addr_main_memory[11:0]),
+    .ad(addr_main_memory[12:0]),
     .din(din_main_memory)
 );
 wire [15:0] ps2_buttons;
 mapper mapper_ins(
+    .clk(clk), 
     .addr_main_memory(addr_main_memory),
     .din_main_memory(din_main_memory),
     .dout_main_memory(dout_main_memory),
@@ -548,15 +460,7 @@ mapper mapper_ins(
     .wre_sdram_manager(wre_sdram_manager__mapper),
     .debug_signal(debug_signal),
 
-    
-    .ad_pixel_ppu__for_mapper_of_main_cpu(ad_pixel_ppu__for_mapper_of_main_cpu),
-    .din_pixel_ppu__for_mapper_of_main_cpu(din_pixel_ppu__for_mapper_of_main_cpu),
-    .dout_pixel_ppu__for_mapper_of_main_cpu(dout_pixel_ppu__for_mapper_of_main_cpu),
-    .wre_pixel_ppu__for_mapper_of_main_cpu(wre_pixel_ppu__for_mapper_of_main_cpu),
-    .addr_tile(ad_cpu___tile_memory),
-    .din_tile(din_cpu___tile_memory),
-    .dout_tile(dout_cpu___tile_memory),
-    .wre_tile(wre_cpu___tile_memory),
+   
 
 
     .addr___collision_stack_cpu(addr___collision_stack_cpu),
@@ -594,17 +498,7 @@ rv32im_cpu___ppu rv32im_cpu_ppu_inst(
 
 
 );
-/*****
-rv32i_cpu  rv32i_cpu_inst(
-    .clk(clk),
-    .reset(reset_cpu|(~lock_pll)),
-    .mem_addr___external(addr_main_memory___rv32im_cpu_inst),
-    .mem_wdata___external(din_main_memory___rv32im_cpu_inst),
-    .mem_rdata___external(dout_mapper),
-    .mem_we___external(wre_main_memory___rv32im_cpu_inst),
-    .enable(1'b1)
-);
-******/
+
 
 /******
 control_leds control_leds_ins(

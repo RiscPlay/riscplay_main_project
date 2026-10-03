@@ -5,14 +5,14 @@ module MAIN_MEMORY (
     input  wire       ce,
     input  wire       reset,
     input  wire       wre,
-    input  wire [11:0] ad,
+    input  wire [12:0] ad,
     input  wire [31:0] din
 );
 
 
     `ifdef SIM  
     reg [31:0] mem [0:4095];
-    reg [11:0] addr_reg;
+    reg [12:0] addr_reg;
     reg [31:0] dout;
     assign dout_wire=dout;
     initial begin
