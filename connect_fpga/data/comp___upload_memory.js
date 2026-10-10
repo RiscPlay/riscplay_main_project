@@ -1,24 +1,4 @@
 
-const COMP___UPLOAD_MEMORY__IS_FILE = 0;
-const COMP___UPLOAD_MEMORY__IS_SPRITE = 1;
-const COMP___UPLOAD_MEMORY__IS_IMAGE = 2;
-function uuidv4() {
-    const bytes = new Uint8Array(16);
-    crypto.getRandomValues(bytes);
-
-    // UUID version 4
-    bytes[6] = (bytes[6] & 0x0f) | 0x40;
-
-    // UUID variant
-    bytes[8] = (bytes[8] & 0x3f) | 0x80;
-
-    return [...bytes]
-        .map((b, i) => {
-            const hex = b.toString(16).padStart(2, '0');
-            return [4, 6, 8, 10].includes(i) ? '-' + hex : hex;
-        })
-        .join('');
-}
 
 function transform_bmp_pallet_and_8bit_pixels_in_array_of_uint32(pixels, palette) {
     var uint32_data = 0;
@@ -44,8 +24,12 @@ function transform_bmp_pallet_and_8bit_pixels_in_array_of_uint32(pixels, palette
 }
 function drawBMPInCanvas(pixels, palette, canvasID) {
     const canvas = document.getElementById(canvasID);
+    if (canvas == null) return;
+    if (pixels[0].length == 0) return;
+
     canvas.width = pixels[0].length;
     canvas.height = pixels.length;
+
     const ctx = canvas.getContext("2d");
 
     const imageData = ctx.createImageData(pixels[0].length, pixels.length);
@@ -61,13 +45,16 @@ function drawBMPInCanvas(pixels, palette, canvasID) {
 }
 
 function comp___upload_memory(options) {
-    options.block_input_value = false;
 
-    if ('addr_mem' in options && options.addr_mem != null)
-        options.block_input_value = true;
+    if (!('block_input_value' in options))
+        options['block_input_value'] = false;
     if (!("addr_mem" in options))
         options["addr_mem"] = ""
     var display_canvas = false;
+    if (!('comp_uuid' in options))
+        var comp_uuid = uuidv4();
+    else
+        var comp_uuid = options.comp_uuid;
 
     if (options.type == COMP___UPLOAD_MEMORY__IS_IMAGE || options.type == COMP___UPLOAD_MEMORY__IS_SPRITE)
         display_canvas = true;
@@ -75,7 +62,44 @@ function comp___upload_memory(options) {
         options["canvas_w"] = 320;
     if (!("canvas_h" in options))
         options["canvas_h"] = 180;
+    if (!('func_to_call_when_data_is_updated' in options)) {
+        options['func_to_call_when_data_is_updated'] = (comp_uuid, type, data) => { };
+    }
+    if (!('func_to_call_when_addr_is_updated' in options)) {
+        options['func_to_call_when_addr_is_updated'] = (comp_uuid, addr) => { };
+    }
 
+    if (!('block_action_send' in options)) {
+        options['block_action_send'] = false;
+    }
+    if (!("show_warnings_about_addr_or_file_need_to_be_selected" in options)) {
+        options['show_warnings_about_addr_or_file_need_to_be_selected'] = false;
+    }
+
+    if (!("pixels" in options))
+        options['pixels'] = [[]];
+    else
+        options['pixels'] = JSON.parse(options.pixels);
+
+    if (!("palette" in options))
+        options['palette'] = [];
+    else
+        options['palette'] = JSON.parse(options.palette);
+    if (!("dataToSend__HexFormat" in options))
+        options['dataToSend__HexFormat'] = null;
+    if (options.dataToSend__HexFormat == "")
+        options.dataToSend__HexFormat = null;
+    if (!("dataToSend" in options))
+        options['dataToSend'] = null;
+    if (options.dataToSend == "")
+        options.dataToSend = null;
+    if (options.dataToSend != null)
+        options.dataToSend = new Uint32Array(JSON.parse(options.dataToSend));
+    if (!("block_remove_action" in options))
+        options.block_remove_action = true;
+    if (!("remove_component" in options)) {
+        options.remove_component = (comp_uuid) => { };
+    }
     return {
         label: options.label,
         addr_mem: options.addr_mem,
@@ -87,15 +111,28 @@ function comp___upload_memory(options) {
         canvasID: uuidv4(),
         fileInputID: uuidv4(),
         type: options.type,
-        dataToSend: null,
-        dataToSend__HexFormat: null,
+        dataToSend: options.dataToSend,
+        dataToSend__HexFormat: options.dataToSend__HexFormat,
         data_words_sent: 0,
         data_total_words: 0,
         error_msg: "",
         file_name_sel: "",
         display_canvas: display_canvas,
+        palette: options.palette,
+        pixels: options.pixels,
+        block_remove_action: options.block_remove_action,
+        remove_component: options.remove_component,
+        func_to_call_when_addr_is_updated___from_parent: options.func_to_call_when_addr_is_updated,
+        func_to_call_when_data_is_updated: options.func_to_call_when_data_is_updated,
+        comp_uuid: options.comp_uuid,
+        block_action_send: options.block_action_send,
+        show_warnings_about_addr_or_file_need_to_be_selected: options.show_warnings_about_addr_or_file_need_to_be_selected,
         async file_upload_box____click_event() {
             document.getElementById(this.fileInputID).click()
+        },
+        async func_to_call_when_addr_is_updated(addr) {
+            this.addr_mem = addr;
+            this.func_to_call_when_addr_is_updated___from_parent(this.comp_uuid, addr);
         },
         async upload_data_to_memory(data, addr) {
             if (this.dataToSend__HexFormat == null) {
@@ -145,12 +182,19 @@ function comp___upload_memory(options) {
         async action_send_file_to_js_browser_memory(event) {
             try {
                 const file = event.target.files[0];
-                if (this.type == COMP___UPLOAD_MEMORY__IS_FILE)
+                if (this.type == COMP___UPLOAD_MEMORY__IS_FILE) {
                     this.dataToSend__HexFormat = await this.loadfile(file);
-                else if (this.type == COMP___UPLOAD_MEMORY__IS_IMAGE)
+                    this.func_to_call_when_data_is_updated(comp_uuid, COMP___UPLOAD_MEMORY__IS_FILE, this.dataToSend__HexFormat);
+                }
+                else if (this.type == COMP___UPLOAD_MEMORY__IS_IMAGE) {
                     this.dataToSend = await this.loadIMG(file);
-                else if (this.type == COMP___UPLOAD_MEMORY__IS_SPRITE)
-                    this.dataToSend = await this.loadBMP(file);
+                    this.func_to_call_when_data_is_updated(comp_uuid, COMP___UPLOAD_MEMORY__IS_IMAGE, this.dataToSend);
+                }
+                else if (this.type == COMP___UPLOAD_MEMORY__IS_SPRITE) {
+                    var data = await this.loadBMP(file);
+                    this.dataToSend = data["dataToSend"];
+                    this.func_to_call_when_data_is_updated(comp_uuid, COMP___UPLOAD_MEMORY__IS_SPRITE, data);
+                }
                 else {
                     this.error = true;
                     this.error_msg = "Wrong option for  upload type. Option code:" + this.type;
@@ -248,7 +292,7 @@ function comp___upload_memory(options) {
 
             await this.$nextTick();
             drawBMPInCanvas(data.pixels, data.palette, this.canvasID);
-            return img;
+            return { "dataToSend": img, "pixels": data.pixels, "palette": data.palette };
         },
         async loadIMG(file) {
             if (!file) return;

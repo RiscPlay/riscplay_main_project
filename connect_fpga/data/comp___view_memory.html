@@ -1,4 +1,5 @@
-<div class="row" style="position: sticky; top: 0;  z-index: 1000; background-color: #1f252e;">
+<div class="row" x-data="comp___view_memory()"
+    style="position: sticky; top: 0;  z-index: 1000; background-color: #1f252e;">
     <div class="col">
         <div class="row">
             <div class="col">
@@ -51,17 +52,19 @@
             </div>
         </div>
     </div>
-</div>
-<div class="row">
-    <div class="col">
-        <div class="docs-card docs-card-alt card  p-20">
-            <div class="card-body p-2" tabindex="0" @keydown.left="movehighlight(-1)" @keydown.right="movehighlight(1)">
-                <div style="font-family: monospace;">
-                    <template x-for="(cell,i) in memory_view.mem" :key="i">
-                        <span @click="format_memory(i)" x-text="cell[display_format]" :style="cell.style"
-                            :class="cell.class">
-                        </span>
-                    </template>
+
+    <div class="row">
+        <div class="col">
+            <div class="docs-card docs-card-alt card  p-20">
+                <div class="card-body p-2" tabindex="0" @keydown.left="movehighlight(-1)"
+                    @keydown.right="movehighlight(1)">
+                    <div style="font-family: monospace;">
+                        <template x-for="(cell,i) in memory_view.mem" :key="i">
+                            <span @click="format_memory(i)" x-text="cell[display_format]" :style="cell.style"
+                                :class="cell.class">
+                            </span>
+                        </template>
+                    </div>
                 </div>
             </div>
         </div>

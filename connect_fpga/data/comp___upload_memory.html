@@ -1,57 +1,108 @@
 <div class="row py-2">
     <div class="col">
-        <h3 x-text="label"></h3>
-    </div>
+        <div class="row">
+            <div class="col">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <h3 x-text="label"></h3>
+                    <template x-if="!block_remove_action">
 
-    <div class="row align-items-center py-2">
+                    <div style="align-content:center; cursor: pointer;" @click="remove_component(comp_uuid)">
+                        <span class="text-danger"  style="display: inline-block; width: 16px; height: 16px; background-color: currentColor; mask: url('x-circle.svg') center / contain no-repeat; -webkit-mask: url('x-circle.svg') center / contain no-repeat;"></span>
+                    </div>
+                    </template>
+                </div>
+            </div>
 
-        <div class="col">
-            <div class="docs-card docs-card-alt card ">
-                <div class="card-body p-2">
-                    <div class=" text-center p-20 py-sm-4"
-                        style="border: 2px dashed var(--border-color); cursor: pointer;"
-                        @click="file_upload_box____click_event()">
-                        <p class="text-muted" x-text="file_name_sel"></p>
-                        <h5 class="card-title">Click here to select file to upload</h5>
+        </div>
+        <div class="row align-items-center py-2">
 
-                        <input :id="fileInputID" type="file" hidden @change="action_send_file_to_js_browser_memory($event)">
+            <div class="col-9">
+                <div class="docs-card docs-card-alt card ">
+                    <div class="card-body p-2">
+                        <div class=" text-center p-20 py-sm-4"
+                            style="border: 2px dashed var(--border-color); cursor: pointer;"
+                            @click="file_upload_box____click_event()">
+                            <p class="text-muted" x-text="file_name_sel"></p>
+                            <h5 class="card-title">Click here to select file to upload</h5>
+
+                            <input :id="fileInputID" type="file" hidden
+                                @change="action_send_file_to_js_browser_memory($event)">
+                        </div>
                     </div>
                 </div>
             </div>
+            <template
+                x-if="show_warnings_about_addr_or_file_need_to_be_selected && (dataToSend===null && dataToSend__HexFormat===null)">
+                <div class="col-3 py-3 p-2">
+                    <div class="alert alert-warning" role="alert">
+                        <h5 class="alert-heading">Warning</h5>
+                        None file selected.
+                    </div>
+                </div>
+            </template>
         </div>
-    </div>
-     
-    <div class="row" hx-get="comp___input_field_hexa.html"
-        hx-trigger="load"
-        hx-swap="innerHTML"
-        x-data="comp___input_field_hexadecimal({
-            label: 'Addr to write',
-            buttonText: 'Upload',
-            initial_input_value: addr_mem,
-            block_input_value:block_input_value,
-            action: (addr) => uploadDataToFPGA(addr)
-        })">
-    </div> 
-    <div class="row" style="margin-top: -10px;">
-        <div class="col">
-                <span x-text="data_words_sent"></span> : <span x-text="data_total_words"></span>
-        </div>
-    </div>
-    <template x-if="display_canvas">
-        <div class="row py-1">
-            <div class="col">
-                <canvas  :id="canvasID" :width="canvas_w" :height="canvas_h"></canvas>
+        <template x-if="!block_action_send">
+            <div class="row" hx-get="comp___input_field_hexa.html" hx-trigger="load" hx-swap="innerHTML" x-data="comp___input_field_hexadecimal({
+                label: 'Addr to write',
+                buttonText: 'Upload',
+                initial_input_value: addr_mem,
+                block_input_value:block_input_value,
+                action: (addr) => uploadDataToFPGA(addr)
+            })">
             </div>
-        </div>
-    </template>
-    <template x-if="error">
-        <div class="row py-1">
-            <div class="col">
-                <div class="alert alert-danger" role="alert">
-                    <h5 class="alert-heading">Danger</h5>
-                    Upload error inside.
+        </template>
+        <template x-if="block_action_send">
+            <div class="row">
+                <div class="col-9">
+                    <div class="row" hx-get="comp___input_field_hexa.html" hx-trigger="load" hx-swap="innerHTML" x-data="comp___input_field_hexadecimal({
+                    label: 'Addr to write',
+                    buttonText: 'Upload',
+                    initial_input_value: addr_mem,
+                    block_input_value:block_input_value,
+                    function_to_call_when___input_value___changed: (addr) => func_to_call_when_addr_is_updated(addr)
+                    })">
+                    </div>
+                </div>
+                <div class="col-3 px-2" style="margin-top: -1em;">
+                    <template x-if="show_warnings_about_addr_or_file_need_to_be_selected && addr_mem===''">
+                        <div class="row">
+                            <div class="col">
+                                <div class="alert alert-warning" role="alert">
+                                    <h5 class="alert-heading">Warning</h5>
+                                    Addr not defined
+                                </div>
+                            </div>
+                        </div>
+                    </template>
                 </div>
             </div>
-        </div>
-    </template>
+
+        </template>
+        <template x-if="!block_action_send">
+
+            <div class="row py-1">
+                <div class="col">
+                    <span x-text="data_words_sent"></span> : <span x-text="data_total_words"></span>
+                </div>
+            </div>
+        </template>
+
+        <template x-if="display_canvas" x-init="await $nextTick(); drawBMPInCanvas(pixels, palette, canvasID)">
+            <div class="row py-1">
+                <div class="col">
+                    <canvas :id="canvasID" :width="canvas_w" :height="canvas_h"></canvas>
+                </div>
+            </div>
+        </template>
+        <template x-if="error">
+            <div class="row py-1">
+                <div class="col">
+                    <div class="alert alert-danger" role="alert">
+                        <h5 class="alert-heading">Danger</h5>
+                        Upload error inside.
+                    </div>
+                </div>
+            </div>
+        </template>
+    </div>
 </div>

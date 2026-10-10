@@ -369,24 +369,16 @@ spi spi_ins (
 
 
 
-
-wire [15:0] out___collision_stack_cpu;
-wire        wre___collision_stack_cpu;
-wire [15:0] input___collision_stack_cpu;
-wire [9:0]  addr___collision_stack_cpu;
-
 wire [7:0]  out_from_sprite_buffer__cpu;
 wire        sprite_buffer_wre__cpu;
 wire [7:0]  input_to_sprite_buffer__cpu;
 wire [13:0] addr_to_sprite_buffer__cpu;
 
-
 wire [63:0]  cmd_to_put_in_ppu_fifo;
 wire         wr_cmd_for_ppu_fifo;
 wire         processing_the_ppu_fifo_insert;
-
 wire         ppu_cmd_fifo_is_empity;
-wire [9:0]   collision_stack_size;
+wire [31:0]  collision_in_group;
 PPU ppu_ins(
     .clk(clk),
     .rst_n(n_reset_global),
@@ -400,15 +392,11 @@ PPU ppu_ins(
     .wr_cmd(wr_cmd_for_ppu_fifo),
     .processing_insert(processing_the_ppu_fifo_insert),
     .fifo_cmd_empty(ppu_cmd_fifo_is_empity),
-    .addr___collision_stack_cpu(addr___collision_stack_cpu),
-    .input___collision_stack_cpu(input___collision_stack_cpu),
-    .out___collision_stack_cpu(out___collision_stack_cpu),
-    .wre___collision_stack_cpu(wre___collision_stack_cpu),
+    .collision_in_group(collision_in_group),
     .out_from_sprite_buffer__cpu(out_from_sprite_buffer__cpu),
     .sprite_buffer_wre__cpu(sprite_buffer_wre__cpu),
     .input_to_sprite_buffer__cpu(input_to_sprite_buffer__cpu),
     .addr_to_sprite_buffer__cpu(addr_to_sprite_buffer__cpu),
-    .collision_stack_size(collision_stack_size),
     .hdmi_ctrl_is_standby(hdmi_ctrl_is_standby),
     .debug_signal(debug_signal),
     .cpu_reseted(reset_cpu),
@@ -458,26 +446,21 @@ mapper mapper_ins(
     .din_sdram_manager(din_sdram_manager__mapper),
     .dout_sdram_manager(dout_sdram_manager__mapper),
     .wre_sdram_manager(wre_sdram_manager__mapper),
+
+    .collision_in_group(collision_in_group),
     .debug_signal(debug_signal),
 
    
-
-
-    .addr___collision_stack_cpu(addr___collision_stack_cpu),
-    .input___collision_stack_cpu(input___collision_stack_cpu),
-    .out___collision_stack_cpu(out___collision_stack_cpu),
-    .wre___collision_stack_cpu(wre___collision_stack_cpu),
     .out_from_sprite_buffer__cpu(out_from_sprite_buffer__cpu),
     .sprite_buffer_wre__cpu(sprite_buffer_wre__cpu),
     .input_to_sprite_buffer__cpu(input_to_sprite_buffer__cpu),
     .addr_to_sprite_buffer__cpu(addr_to_sprite_buffer__cpu),
-    .collision_stack_size(collision_stack_size),
     .ps2_buttons(ps2_buttons),
     .count_pulses_since_riscv_started(count_pulses_since_riscv_started),
     .count_pulses_where_sdram_controller_is_idle(count_pulses_where_sdram_controller_is_idle),
     .count_pulses_where_ppu_is_idle(count_pulses_where_ppu_is_idle)
 );
-rv32im_cpu___ppu rv32im_cpu_ppu_inst(
+rv32im_cpu rv32im_cpu_inst(
     .clk(clk),
     .reset(reset_cpu|(~lock_pll)),
     .mem_addr___external(addr_main_memory___rv32im_cpu_inst),
@@ -541,9 +524,8 @@ ps2_controller controller (
     .ps2_clk(ds_clk),
     .ps2_cmd(ds_mosi),
     .ps2_dat(ps2_dat),
-
+   // .debug_signal(debug_signal),
     .buttons(ps2_buttons)
-   // .debug_signal(debug_signal)
 
 );
 

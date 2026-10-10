@@ -1,4 +1,4 @@
-module rv32im_cpu___ppu(
+module rv32im_cpu(
     input clk,
     input reset,
 
@@ -103,10 +103,10 @@ module rv32im_cpu___ppu(
 
   wire sync__state=state_prev==state;
   `ifndef SIM
-  `include "alu_defines___ppu.vh"
+  `include "alu_defines.vh"
   `endif
   `ifdef SIM
-  `include "ppu/riscv/alu_defines___ppu.vh"
+  `include "riscvrv32im/alu_defines.vh"
   `endif
   
 
@@ -273,10 +273,10 @@ module rv32im_cpu___ppu(
             end
             7'b0100011: begin
               `ifndef SIM
-              `include "store___ppu.vh"
+              `include "store.vh"
               `endif
               `ifdef SIM
-              `include "ppu/riscv/store___ppu.vh"
+              `include "riscvrv32im/store.vh"
               `endif
               if(sync__state & time_that_stage_hold>8'h00 & (~memory_control___busy)) begin
                 state<= MEMORY;
@@ -290,10 +290,10 @@ module rv32im_cpu___ppu(
             end
             7'b0010011: begin
               `ifndef SIM
-              `include "alu_im___ppu.vh"
+              `include "alu_im.vh"
               `endif
               `ifdef SIM
-              `include "ppu/riscv/alu_im___ppu.vh"
+              `include "riscvrv32im/alu_im.vh"
               `endif
               state <= WRITEBACK;
               write_in_register<=1'b1;
@@ -305,10 +305,10 @@ module rv32im_cpu___ppu(
             end
             7'b0110011: begin
               `ifndef SIM
-              `include "alu___ppu.vh"
+              `include "alu.vh"
               `endif
               `ifdef SIM
-              `include "ppu/riscv/alu___ppu.vh"
+              `include "riscvrv32im/alu.vh"
               `endif
               state <= WRITEBACK;
               write_in_register<=1'b1;
@@ -320,10 +320,10 @@ module rv32im_cpu___ppu(
             end
             7'b1100011: begin
               `ifndef SIM
-              `include "branch___ppu.vh"
+              `include "branch.vh"
               `endif
               `ifdef SIM
-              `include "ppu/riscv/branch___ppu.vh"
+              `include "riscvrv32im/branch.vh"
               `endif
               state <= WRITEBACK;
               `ifdef SIM
@@ -368,10 +368,10 @@ module rv32im_cpu___ppu(
             end
             7'b0001011: begin //custom fixed point instructions
               `ifndef SIM
-              `include "alu_fixed_point___ppu.vh"
+              `include "alu_fixed_point.vh"
               `endif
               `ifdef SIM
-              `include "ppu/riscv/alu_fixed_point___ppu.vh"
+              `include "riscvrv32im/alu_fixed_point.vh"
               `endif
               state <= WRITEBACK;
               write_in_register<=1'b1;
@@ -383,10 +383,10 @@ module rv32im_cpu___ppu(
             end
             7'b0101011: begin //custom ppu instructions
               `ifndef SIM
-              `include "control_ppu___ppu.vh"
+              `include "control_ppu.vh"
               `endif
               `ifdef SIM
-              `include "ppu/riscv/control_ppu___ppu.vh"
+              `include "riscvrv32im/control_ppu.vh"
               `endif
             end
             7'b0001111: begin // FENCE
@@ -404,10 +404,10 @@ module rv32im_cpu___ppu(
           case(opcode)
             7'b0000011: begin
               `ifndef SIM
-              `include "load___ppu.vh"
+              `include "load.vh"
               `endif 
               `ifdef SIM
-              `include "ppu/riscv/load___ppu.vh"
+              `include "riscvrv32im/load.vh"
               `endif 
               `ifdef SIM
               print_rd<=1'b1;
@@ -489,66 +489,5 @@ module rv32im_cpu___ppu(
     end
 
   end
-
-
-/************
-reg          rd_en;
-wire [20:0]  rd_data;
-wire         empty;
-wire         processing_pop;
-Fifo_Frame_Buffer fifo_Frame_Buffer__ins(
-  .clk(clk),
-  .rst_n(!reset),
-  .wr_en(wr_en__fb),
-  .wr_data(wr_data__fb),
-  .rd_en(rd_en),
-  .empty(empty),
-  .full(full__fb),
-  .processing_insert(processing_insert__fb),
-  .processing_pop(processing_pop),
-  .near_to_be_full(near_to_be_full__fb)
-);
-reg [3:0] fb_state;
-always @(posedge clk) begin
-    if(reset) begin
-      fb_state<=4'h0;
-      rd_en<=1'b0;
-    end
-    else begin
-      case(fb_state) 
-        default: fb_state<=4'h0;
-        4'h0: begin 
-          if(!empty) begin
-            rd_en<=1'b1;
-            fb_state<= 4'h1;
-          end
-        end
-        4'h1: begin
-          fb_state<= 4'h2;
-          rd_en<=1'b0;
-        end
-        4'h2: begin
-          if(processing_pop==1'b0) begin
-            addr_to_frame_buffer<=rd_data;
-            set_addr_to_frame_buffer<=1'b1;
-            fb_state<= 4'h3;
-          end
-        end
-        4'h3: begin
-          fb_state<= 4'h4;
-        end
-        4'h4: begin
-          fb_state<= 4'h5;
-        end
-        4'h5: begin
-          set_addr_to_frame_buffer<=1'b0;
-          if(set_addr_to_frame_buffer__ack) begin
-            fb_state<=4'h0;
-          end
-        end
-      endcase
-    end
-end
-************/
 
 endmodule

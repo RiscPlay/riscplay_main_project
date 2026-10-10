@@ -35,12 +35,7 @@ module mapper(
     output wire [7:0]  input_to_sprite_buffer__cpu,
     output wire [13:0] addr_to_sprite_buffer__cpu,
 
-    output wire [9:0]  addr___collision_stack_cpu,
-    output wire [15:0] input___collision_stack_cpu,
-    input  wire [15:0] out___collision_stack_cpu,
-    output wire        wre___collision_stack_cpu,
 
-    input  wire [9:0]  collision_stack_size,
 
     input wire [31:0] debug_signal,
     input wire [15:0] ps2_buttons,
@@ -53,7 +48,9 @@ module mapper(
     input  wire [31:0] addr_mapper,
     input  wire [31:0] din_mapper,
     output wire [31:0] dout_mapper,
-    input  wire        wre_mapper
+    input  wire        wre_mapper,
+
+    input wire  [31:0] collision_in_group
     
 );
 
@@ -113,7 +110,6 @@ assign input_to_sprite_buffer__cpu  = din_mapper[31:24] ;
 assign sprite_buffer_wre__cpu   = sel_sprite ? wre_mapper : 1'b0;
 
 
-assign addr___collision_stack_cpu = addr_mapper[15:0];
 
 
 //
@@ -122,9 +118,8 @@ assign addr___collision_stack_cpu = addr_mapper[15:0];
 assign dout_mapper =
     sel_main                   ? dout_main_memory :
     sel_control                ? dout_control_cpu_memory :
+    sel_colision               ? collision_in_group :
     sel_sdram                  ? dout_sdram_manager :
-    sel_colision               ? {out___collision_stack_cpu,16'h0} :
-    sel_col_size               ? {collision_stack_size,22'b0}:
     sel_ps2_buttons            ? {16'h0,ps2_buttons}:
     data_out_buffer;
 
@@ -142,6 +137,8 @@ always @(posedge clk) begin
         data_out_buffer<=count_pulses_where_sdram_controller_is_idle[63:32];
     else if(sel_count_pulses_ram_p2)
         data_out_buffer<=count_pulses_where_sdram_controller_is_idle[31:0];
+    else if(sel_debug) 
+        data_out_buffer<=debug_signal;
     else
         data_out_buffer <=32'h0;
 end

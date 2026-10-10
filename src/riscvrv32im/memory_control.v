@@ -1,4 +1,4 @@
-module memory_control(
+module memory_control___ppu(
     input   wire         clk,
     output  wire  [31:0] mem_addr___from_cpu,
     output  reg  [31:0]  mem_wdata___from_cpu,
