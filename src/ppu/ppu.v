@@ -97,8 +97,7 @@ reg signed [8:0] posiy_in_screen;
 localparam [9:0] size_x_screen = 10'sd320;
 localparam [8:0] size_y_screen = 9'sd180;
 
-reg  [15:0] current_sprite_width__latch;
-reg  [15:0] current_sprite_height__latch;
+
 
 localparam cmd_type__load_pallet  = 4'h0;
 
@@ -175,7 +174,7 @@ localparam CMD_TYPE__DATA_FROM_SDRAM_TO_PALLET  = 4'h1;
 localparam CMD_TYPE__RENDER_SPRITE = 4'h2;
 localparam CMD_TYPE__CLEAN_FRAME_BUFFER = 4'h3;
 localparam CMD_TYPE__CLEAN_COLISION_STACK=4'h4;
-localparam CMD_TYPE__SET_CURRENT_SPRITE_WIDTH=4'h5;
+localparam CMD_TYPE__NONE=4'h5;
 
 reg [7:0]  pointer_to_write_in_pallet;
 reg [6:0]  pointer_to_write_in_sdram;
@@ -275,9 +274,7 @@ always @(posedge clk) begin
                         CMD_TYPE__CLEAN_COLISION_STACK: begin
                             state<=STATE_CLEAN_COLISION_STACK;
                         end
-                        CMD_TYPE__SET_CURRENT_SPRITE_WIDTH: begin
-                            current_sprite_width__latch[7:0]<=current_sprite_width;
-                            current_sprite_height__latch[7:0]<=current_sprite_height;
+                        CMD_TYPE__NONE: begin
                             state<=STATE_IDLE_P0;
                         end
                     endcase
@@ -426,14 +423,14 @@ always @(posedge clk) begin
                     n_pixels_written_to_frame_buffer_line<=n_pixels_written_to_frame_buffer_line+8'h01;
                     addr_sdram_manager__pixel_ppu[21:13]<=9'b100000001;
                     if(n_pixels_stored_in_sdram<length_sprite_buffer__latch && posix_in_screen>= 9'sd0 && posiy_in_screen>= 8'sd0 && posiy_in_screen<size_y_screen && posix_in_screen<size_x_screen)  begin
-                        if(dout_sdram_manager__pixel_ppu[31:24]!=8'b0000000) begin
+                        if(dout_sdram_manager__pixel_ppu[31:24]!=8'hff && dout_sdram_manager__pixel_ppu[27:24]!=sprit_id) begin
                             `ifdef ___COLISSION___ 
                                 collision_happened=1'b1;
-                                coll_bit1_pos_rendering<=({1'b0,sprit_id[1:0],dout_sdram_manager__pixel_ppu[1:0]}<<1)+5'b00000;
-                                coll_bit2_pos_rendering<=({1'b0,sprit_id[1:0],dout_sdram_manager__pixel_ppu[1:0]}<<1)+5'b00001;
+                                coll_bit1_pos_rendering<={1'b0,sprit_id[1:0],dout_sdram_manager__pixel_ppu[25:24]};
+                                coll_bit2_pos_rendering<={1'b0,sprit_id[1:0],dout_sdram_manager__pixel_ppu[25:24]}+5'b10000;
 
-                                coll_bit1_pos_rendered<=({1'b0,dout_sdram_manager__pixel_ppu[1:0],sprit_id[1:0]}<<1)+5'b00000;
-                                coll_bit2_pos_rendered<=({1'b0,dout_sdram_manager__pixel_ppu[1:0],sprit_id[1:0]}<<1)+5'b00001;
+                                coll_bit1_pos_rendered<={1'b0,dout_sdram_manager__pixel_ppu[25:24],sprit_id[1:0]};
+                                coll_bit2_pos_rendered<={1'b0,dout_sdram_manager__pixel_ppu[25:24],sprit_id[1:0]}+5'b10000;
                                 if(out_from_sprite_buffer==8'hff)
                                     collision_in_transp_sprite_rendering<=1'b1;
                                 else 
@@ -478,7 +475,19 @@ always @(posedge clk) begin
                     end
                     else begin 
                         state<=STATE_RENDER_SPRITE_TO_SDRAM_P2;
-                    end                    
+                    end    
+                    if(collision_happened) begin
+                        if(collision_in_transp_sprite_rendering==1'b0) 
+                            collision_in_group[coll_bit1_pos_rendering]<=1'b1;
+                        else 
+                            collision_in_group[coll_bit2_pos_rendering]<=1'b1;
+
+
+                        if(collision_in_transp_sprite_rendered==1'b0) 
+                            collision_in_group[coll_bit1_pos_rendered]<=1'b1;
+                        else                   
+                            collision_in_group[coll_bit2_pos_rendered]<=1'b1;
+                    end                
                 end
                 else begin
                     if(n_pixels_written_to_frame_buffer_line<current_sprite_width || (inv_y_during_render==1'b0 && inv_x_during_render==1'b0)) begin
@@ -506,15 +515,7 @@ always @(posedge clk) begin
                     
                     posix_in_screen<=posix_in_screen+9'sd1;
 
-                    if(collision_happened) begin
-                        collision_in_group[coll_bit2_pos_rendering]<=collision_in_group[coll_bit2_pos_rendering]|collision_in_transp_sprite_rendering;
-                        if(collision_in_transp_sprite_rendering==1'b0) 
-                            collision_in_group[coll_bit1_pos_rendering]<=1'b1;
-                        collision_in_group[coll_bit2_pos_rendered]<=collision_in_group[coll_bit2_pos_rendered]|collision_in_transp_sprite_rendered;
-                        if(collision_in_transp_sprite_rendered==1'b0) 
-                            collision_in_group[coll_bit1_pos_rendered]<=1'b1;
-                  
-                    end
+                    
                 end
             end
             STATE_RENDER_SPRITE_TO_SDRAM_P5: begin

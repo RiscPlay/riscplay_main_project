@@ -50,7 +50,9 @@ module mapper(
     output wire [31:0] dout_mapper,
     input  wire        wre_mapper,
 
-    input wire  [31:0] collision_in_group
+    input wire  [31:0] collision_in_group,
+
+    input wire  [31:0] centisecond_tick_count
     
 );
 
@@ -66,7 +68,7 @@ wire sel_sdram    = addr_mapper[31:28]==4'b1;
 wire sel_colision            = addr_mapper[31:26]==6'b1;
 wire sel_sprite              = addr_mapper[31:25]==7'b1;
 wire sel_control             = addr_mapper[31:25]==7'b0 && addr_mapper[8]==1'b1;
-wire sel_col_size            = addr_mapper[31:25]==7'b0 && addr_mapper[8]==1'b0 && addr_mapper[3:0]==4'b0000;
+wire sel_centisecond_count   = addr_mapper[31:25]==7'b0 && addr_mapper[8]==1'b0 && addr_mapper[3:0]==4'b0000;
 wire sel_ps2_buttons         = addr_mapper[31:25]==7'b0 && addr_mapper[8]==1'b0 && addr_mapper[3:0]==4'b0011;
 wire sel_count_pulses_cpu_p1 = addr_mapper[31:25]==7'b0 && addr_mapper[8]==1'b0 && addr_mapper[3:0]==4'b0100;
 wire sel_count_pulses_cpu_p2 = addr_mapper[31:25]==7'b0 && addr_mapper[8]==1'b0 && addr_mapper[3:0]==4'b0101;
@@ -121,10 +123,13 @@ assign dout_mapper =
     sel_colision               ? collision_in_group :
     sel_sdram                  ? dout_sdram_manager :
     sel_ps2_buttons            ? {16'h0,ps2_buttons}:
+    sel_centisecond_count      ? {centisecond_tick_count} :
+    sel_sprite                 ? {24'h0, out_from_sprite_buffer__cpu} :
     data_out_buffer;
 
 reg [31:0] data_out_buffer;
 always @(posedge clk) begin
+    /*
    if(sel_count_pulses_cpu_p1)
         data_out_buffer<=count_pulses_since_riscv_started[63:32];
     else if(sel_count_pulses_cpu_p2)
@@ -141,6 +146,7 @@ always @(posedge clk) begin
         data_out_buffer<=debug_signal;
     else
         data_out_buffer <=32'h0;
+        */
 end
 
 endmodule

@@ -38,13 +38,22 @@ wire reset_cpu;
 wire enable;
 
 wire [31:0] debug_signal;
+reg  [23:0] centisecond_counter;
 reg  [63:0] count_pulses_since_riscv_started;
+reg  [31:0] centisecond_tick_count;
 always @(posedge clk) begin
     if(reset_cpu) begin
+        centisecond_counter<=24'h0;
         count_pulses_since_riscv_started<=64'h0;
+        centisecond_tick_count<=32'h0;
     end
     else if(enable) begin
-            count_pulses_since_riscv_started<=count_pulses_since_riscv_started+64'h1;
+        centisecond_counter<=centisecond_counter+24'h1;
+        count_pulses_since_riscv_started<=count_pulses_since_riscv_started+64'h1;
+        if(centisecond_counter==24'hb5463)begin
+            centisecond_counter<=24'h0;
+            centisecond_tick_count<=centisecond_tick_count+32'h1;
+        end
     end
 end
 
@@ -458,7 +467,8 @@ mapper mapper_ins(
     .ps2_buttons(ps2_buttons),
     .count_pulses_since_riscv_started(count_pulses_since_riscv_started),
     .count_pulses_where_sdram_controller_is_idle(count_pulses_where_sdram_controller_is_idle),
-    .count_pulses_where_ppu_is_idle(count_pulses_where_ppu_is_idle)
+    .count_pulses_where_ppu_is_idle(count_pulses_where_ppu_is_idle),
+    .centisecond_tick_count(centisecond_tick_count)
 );
 rv32im_cpu rv32im_cpu_inst(
     .clk(clk),

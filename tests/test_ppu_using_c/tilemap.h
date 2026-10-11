@@ -49,7 +49,7 @@ static const char *__tilemap__[] = {
   "#                                                                                                                       "
 };
 
-void define_tile_addr(uint32_t *tile_sprite_to_sdram){
+void define_tile_addrs(uint32_t *tile_sprite_to_sdram){
   for(int i=0;i<128;i++){
     tile_sprite_to_sdram[i]=UINT32_MAX;
   }
@@ -57,5 +57,12 @@ void define_tile_addr(uint32_t *tile_sprite_to_sdram){
   tile_sprite_to_sdram['a']=0xe3100;
 
 }
+void define_tile_sprites_ids(uint32_t *tile_sprits_ids){
+  for(int i=0;i<128;i++){
+    tile_sprits_ids[i]=0;
+  }
+  tile_sprits_ids['#']=3;
+  tile_sprits_ids['a']=3;
 
+}
 #endif

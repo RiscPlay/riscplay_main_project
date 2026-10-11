@@ -1,8 +1,15 @@
-
+#include <stdbool.h>
 #include <stdint.h>
 #include "tilemap.h"
 #define __SCREEN____SIZEX__ 320
 #define __SCREEN____SIZEY__ 180
+#define NO_COLLISION 2
+uint32_t __big_to_little_endian(uint32_t value) {
+    return ((value & 0x000000FF) << 24) |
+           ((value & 0x0000FF00) << 8)  |
+           ((value & 0x00FF0000) >> 8)  |
+           ((value & 0xFF000000) >> 24);
+}
 uint32_t nes_palette(uint8_t color)
 {
     switch (color) {
@@ -78,6 +85,17 @@ uint32_t nes_palette(uint8_t color)
     }
 }
 
+void __send_blank_cmd_to_ppu(){
+    uint32_t cmd_type= UINT32_C(0x50000000);//0x3<<28
+    uint32_t rs1=cmd_type;
+    uint32_t rs2=0;
+    asm volatile (
+        ".insn r 0x2B, 0x0, 0x00, x0, %0, %1"
+        :
+        : "r"(rs1), "r"(rs2)
+        : "memory"
+    );
+}
 void ppu_wait_nmi(){
      asm volatile (
         ".insn r 0x2B, 0x1, 0x00, x0, x0, x0"
@@ -85,6 +103,10 @@ void ppu_wait_nmi(){
         : 
         : "memory"
     );
+}
+void ppu_finished_all_operations(){
+    __send_blank_cmd_to_ppu();
+    ppu_wait_nmi();
 }
 void set_backgound(uint32_t sdram_addr,uint32_t color)
 {
@@ -115,7 +137,7 @@ void copy_sprite_from_sdram_to_buffer(uint32_t sdram_addr, uint32_t n_pixels_to_
 void __render_sprite(uint32_t id,uint32_t sdram_addr,uint32_t width,uint32_t height,int32_t inittial__posix_in_screen, int32_t inittial_posiy_in_screen,uint32_t invert_render_x,uint32_t invert_render_y)
 {
     uint32_t cmd_type= UINT32_C(0x20000000);//0x2<<28
-    uint32_t rs1=cmd_type|(sdram_addr<<7)|(id<<4)|((width&0x70)>>4);
+    uint32_t rs1=cmd_type|(sdram_addr<<7)|(id<<3)|((width&0x70)>>4);
     uint32_t buffer_addr=0;
     uint32_t rs2=((width&0xf)<<28)|(height<<21)|((((uint32_t)inittial__posix_in_screen)&0x3ff)<<11) |((((uint32_t)inittial_posiy_in_screen)&0x1ff)<<2) | (invert_render_x<<1)|(invert_render_y);
     asm volatile (
@@ -157,7 +179,7 @@ void set_frame_buffer(uint32_t sdram_addr,uint32_t horizontal_offset)
     );
 }
 
-void print_tilemap(const char *tilemap[], uint32_t *tile_sprite_to_sdram, uint32_t addr_buffer,int posi_x_init, int posi_y_init, int tilemap_sizex, int tilemap_sizey, int tile_size ){
+void print_tilemap(const char *tilemap[], uint32_t *tile_sprite_to_sdram,uint32_t *tile_sprites_ids, uint32_t addr_buffer,int posi_x_init, int posi_y_init, int tilemap_sizex, int tilemap_sizey, int tile_size ){
     int min_indx_to_get=posi_x_init/tile_size;
     int min_indy_to_get=posi_y_init/tile_size;
 
@@ -167,28 +189,30 @@ void print_tilemap(const char *tilemap[], uint32_t *tile_sprite_to_sdram, uint32
     int y=first_y;
     int indx=min_indx_to_get;
     int indy=min_indy_to_get;
-    uint32_t sprit_addr=0;
-    uint32_t last_sprit_addr=0;
+    uint32_t sprite_addr=0;
+    uint32_t last_sprite_addr=0;
     uint32_t print_sprite=0;
+    uint32_t sprite_id;
     while(y<__SCREEN____SIZEY__){
         while(x<__SCREEN____SIZEX__){
             print_sprite=0;
             int sprite_char=(int)tilemap[indy][indx];
             if(tile_sprite_to_sdram[sprite_char] !=UINT32_MAX) {
-                sprit_addr=tile_sprite_to_sdram[sprite_char];
+                sprite_addr=tile_sprite_to_sdram[sprite_char];
                 print_sprite=1;
+                sprite_id=tile_sprites_ids[sprite_char];
 
             }
-            if(sprit_addr!=last_sprit_addr){
-                load_pallet_from_sdram(sprit_addr-0x100);
-                copy_sprite_from_sdram_to_buffer(sprit_addr,tile_size*tile_size,0x0);
+            if(sprite_addr!=last_sprite_addr){
+                load_pallet_from_sdram(sprite_addr-0x100);
+                copy_sprite_from_sdram_to_buffer(sprite_addr,tile_size*tile_size,0x0);
             }
             if(print_sprite){        
-                render_sprite(2,addr_buffer, tile_size,tile_size,x,y,0,0);
+                render_sprite(3,addr_buffer, tile_size,tile_size,x,y,0,0);
             }
             indx=indx+1;
             x=x+tile_size;
-            last_sprit_addr=sprit_addr;
+            last_sprite_addr=sprite_addr;
         }
         x=first_x;
         indx=min_indx_to_get;
@@ -196,4 +220,46 @@ void print_tilemap(const char *tilemap[], uint32_t *tile_sprite_to_sdram, uint32
         y=y+tile_size;
     }
     
+}
+
+void clear_collision()
+{
+    uint32_t cmd_type= UINT32_C(0x40000000);//0x3<<28
+    uint32_t rs1=cmd_type;
+    uint32_t rs2=UINT32_C(0);
+    asm volatile (
+        ".insn r 0x2B, 0x0, 0x00, x0, %0, %1"
+        :
+        : "r"(rs1), "r"(rs2)
+        : "memory"
+    );
+}
+
+int check_collision(uint32_t sprite_id1, uint32_t sprite_id2) {
+    volatile uint32_t *collision_ptr = (volatile uint32_t *)0x10000000;
+    uint32_t collision=__big_to_little_endian(*collision_ptr);
+
+    uint32_t collisions_of_sprite_1=(collision>>(sprite_id1<<2))&UINT32_C(0xf);
+    uint32_t collision_of_sprite_1_and_sprite_2=(collisions_of_sprite_1>>sprite_id2)&UINT32_C(0x1);
+    return collision_of_sprite_1_and_sprite_2;
+}
+
+int check_collision_in_transparency(uint32_t sprite_id1, uint32_t sprite_id2) {
+    volatile uint32_t *collision_ptr = (volatile uint32_t *)0x10000000;
+    uint32_t collision=__big_to_little_endian(*collision_ptr);
+    return  collision;
+    collision=collision>>16;
+
+    uint32_t collisions_of_sprite_1=(collision>>(sprite_id1<<2))&UINT32_C(0xf);
+    uint32_t collision_of_sprite_1_and_sprite_2=(collisions_of_sprite_1>>sprite_id2)&UINT32_C(0x1);
+    return collision_of_sprite_1_and_sprite_2;
+}
+
+uint32_t get_time(){
+    volatile uint32_t *time = (volatile uint32_t *)0x00000000;
+    return  __big_to_little_endian(*time);
+}
+uint32_t get_ps2_controller_state(){
+    volatile uint32_t *ps2_controller_ptr = (volatile uint32_t *)0x0000000c;
+    return *ps2_controller_ptr;
 }
