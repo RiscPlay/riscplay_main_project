@@ -19,7 +19,7 @@ int main(void){
     int posix=0;
     int posiy=0;
     int inc=1;
-    int addr_buffer[4];
+    int addr_buffer[2];
     addr_buffer[0] = 0xa080;//((320*128)+128)
     addr_buffer[1] = 0x18180;//((320*128)+128)+(320*180)
 

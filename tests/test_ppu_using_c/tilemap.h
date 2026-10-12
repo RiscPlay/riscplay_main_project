@@ -3,8 +3,8 @@
 #include <stdint.h>
 #define  ___TILE_SIZE__ 9
 #define  ___TILEMAP_SIZEX__ 120
-#define  ___TILEMAP_SIZEX_PLUS_1__ 121
-#define  ___TILEMAP_SIZEY__ 40
+#define  ___TILEMAP_SIZEX_PLUS_1__ ___TILEMAP_SIZEX__+1
+#define  ___TILEMAP_SIZEY__ 20 //180/9=20 180 size_y display
 
 static const char *__tilemap__[] = {
    "##                                                                                                                      ",

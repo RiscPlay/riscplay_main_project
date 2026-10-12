@@ -1,4 +1,8 @@
-/opt/riscv/bin/riscv32-unknown-elf-gcc \
+#!/bin/bash
+chmod +x riscv32_unknown_elf_objcopy.AppImage
+chmod +x riscv32_unknown_elf_gcc.AppImage
+
+./riscv32_unknown_elf_gcc.AppImage \
 -march=rv32im \
 -mabi=ilp32 \
 -O0 \
@@ -20,4 +24,4 @@ startup.S $1 \
 -lnosys \
 -o firmware.elf 
 
-/opt/riscv/bin/riscv32-unknown-elf-objcopy -O binary firmware.elf firmware.bin
+./riscv32_unknown_elf_objcopy.AppImage  -O binary firmware.elf firmware.bin

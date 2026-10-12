@@ -13,3 +13,5 @@ connect_fpga/.pio
 *.vcd
 *.view.json
 *.mi
+appimage_compiler/dist
+appimage_compiler/dist_*
