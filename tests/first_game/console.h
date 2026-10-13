@@ -27,7 +27,7 @@ uint32_t nes_palette(uint8_t color)
         case 0x0B: return 0xFF005800;
         case 0x0C: return 0xFF004058;
         case 0x0D: return 0xFF000000;
-        case 0x0E: return 0xFF000000;
+        case 0x0E: return 0xff3cabff;
         case 0x0F: return 0xFF000000;
 
         case 0x10: return 0xFFBCBCBC;
@@ -208,7 +208,7 @@ void print_tilemap(const char *tilemap[], uint32_t *tile_sprite_to_sdram,uint32_
                 copy_sprite_from_sdram_to_buffer(sprite_addr,tile_size*tile_size,0x0);
             }
             if(print_sprite){        
-                render_sprite(3,addr_buffer, tile_size,tile_size,x,y,0,0);
+                render_sprite(sprite_id,addr_buffer, tile_size,tile_size,x,y,0,0);
             }
             indx=indx+1;
             x=x+tile_size;

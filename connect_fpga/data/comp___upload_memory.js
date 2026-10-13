@@ -1,16 +1,42 @@
 
-
+function rand_rgb() {
+    const n = Math.floor(Math.random() * (2 ** 24)) >>> 0;
+    const r = (n >> 16) & 0xFF;
+    const g = (n >> 8) & 0xFF;
+    const b = n & 0xFF;
+    return { "r": r, "g": g, "b": b, "n": n };
+}
 function transform_bmp_pallet_and_8bit_pixels_in_array_of_uint32(pixels, palette) {
     var uint32_data = 0;
     var n_uint8_stored__in__uint32_to_transform_in_hex = 0;
     const img = new Uint32Array(256 + pixels.length * pixels[0].length);
     let point_to_write_in_img = 0;
-    for (let i = 0; i < palette.length; i++) {
+    var numbers_of_pallet = [];
+    for (let i = 0; i < palette.length - 1; i++) {
         img[i] = ((palette[i].r << 16) >>> 0) + ((palette[i].g << 8) >>> 0) + (palette[i].b >>> 0);
+        numbers_of_pallet.push(((palette[i].r << 16) >>> 0) + ((palette[i].g << 8) >>> 0) + (palette[i].b >>> 0));
     }
+    numbers_of_pallet.push(((palette[palette.length - 1].r << 16) >>> 0) + ((palette[palette.length - 1].g << 8) >>> 0) + (palette[palette.length - 1].b >>> 0));
+    for (let i = (palette.length - 1); i < 255; i++) {
+        while (true) {
+            v = rand_rgb()
+            if (!numbers_of_pallet.includes(v['n'])) {
+                numbers_of_pallet.push(v['n']);
+                img[i] = v['n'];
+                break;
+            }
+        }
+    }
+    img[255] = ((palette[palette.length - 1].r << 16) >>> 0) + ((palette[palette.length - 1].g << 8) >>> 0) + (palette[palette.length - 1].b >>> 0);
+
+
     for (let i = 0; i < pixels.length; i++) {
         for (let j = 0; j < pixels[i].length; j++) {
-            uint32_data = ((uint32_data << 8) >>> 0) + pixels[i][j];
+            var pixel1 = pixels[i][j];
+            if (pixel1 == (palette.length - 1)) {
+                pixel1 = 255;
+            }
+            uint32_data = ((uint32_data << 8) >>> 0) + pixel1;
             n_uint8_stored__in__uint32_to_transform_in_hex = n_uint8_stored__in__uint32_to_transform_in_hex + 1;
             if (n_uint8_stored__in__uint32_to_transform_in_hex == 4) {
                 n_uint8_stored__in__uint32_to_transform_in_hex = 0;

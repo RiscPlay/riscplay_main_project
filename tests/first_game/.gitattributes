@@ -1,0 +1,2 @@
+*.bmp filter=lfs diff=lfs merge=lfs -text
+*.prog filter=lfs diff=lfs merge=lfs -text

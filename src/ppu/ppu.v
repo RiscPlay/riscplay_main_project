@@ -402,20 +402,20 @@ always @(posedge clk) begin
                 if(sync__state && time_that_stage_hold>8'h01) begin
                     wre_sdram_manager__pixel_ppu<=1'b0;
                 end
-                if(sync__state && time_that_stage_hold> 8'h04) begin
-                    if(sdram_manager_is_processing_request_from__pixel_ppu==1'b1) begin
+                if(sync__state && time_that_stage_hold> 8'h09) begin
+                    if(sdram_manager_is_processing_request_from__pixel_ppu==1'b0) begin
                         state<=STATE_RENDER_SPRITE_TO_SDRAM_P2;
                         pointer_to_get_data_from_sdram<=22'h0;
                     end
                 end
             end
             STATE_RENDER_SPRITE_TO_SDRAM_P2: begin
-                if((pointer_to_get_data_from_sdram[6:0]+7'b1)<n_32bits_words_processed_by_current_pixel_ppu_request || sdram_manager_is_processing_request_from__pixel_ppu==1'b0) begin
+                //if((pointer_to_get_data_from_sdram[6:0]+7'h3)<n_32bits_words_processed_by_current_pixel_ppu_request || sdram_manager_is_processing_request_from__pixel_ppu==1'b0) begin
                     addr_sdram_manager__pixel_ppu<=pointer_to_get_data_from_sdram;
                     pointer_to_get_data_from_sdram<=pointer_to_get_data_from_sdram+22'h1;
                     state<=STATE_RENDER_SPRITE_TO_SDRAM_P3;
                     collision_happened<=1'b0;
-                end
+                //end
             end
             STATE_RENDER_SPRITE_TO_SDRAM_P3: begin
                 if(sync__state) begin

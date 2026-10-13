@@ -27,16 +27,18 @@ int main(void){
     ppu_finished_all_operations();
     int32_t frames=0;
     while(1){
-        set_backgound(addr_buffer[buffer],3);
-        print_tilemap(__tilemap__,tile_sprite_to_sdram,tile_sprites_ids,addr_buffer[buffer],posix, 0, ___TILEMAP_SIZEX__, ___TILEMAP_SIZEY__, ___TILE_SIZE__ ); 
+        set_backgound(addr_buffer[buffer],0x0E);
+        print_tilemap(__tilemap__,tile_sprite_to_sdram,tile_sprites_ids,addr_buffer[buffer],posix, 10, ___TILEMAP_SIZEX__, ___TILEMAP_SIZEY__, ___TILE_SIZE__ ); 
         
-        
-        copy_sprite_from_sdram_to_buffer(0xA0100,16*12,0x0);
+        //copy_sprite_from_sdram_to_buffer(0x50100,28*28,0x0); 
+        //load_pallet_from_sdram(0x50000);
+        //render_sprite(0,addr_buffer[buffer], 28,28,100,30,0,0);
         load_pallet_from_sdram(0xA0000);
-
+        copy_sprite_from_sdram_to_buffer(0xA0100,16*12,0x0);
         render_sprite(0,addr_buffer[buffer], 16,12,100,100,0,0);
         
         ppu_finished_all_operations();
+        /*
         if(time_when_collision_happen>0 && ((int32_t)get_time()- time_when_collision_happen)> INT32_C(50) ){
             time_when_collision_happen=-1;
             ppu_finished_all_operations();
@@ -49,7 +51,7 @@ int main(void){
                 else inv_posix_inc=0;
             }
         }
-
+        */
         clear_collision();
 
         frames++;
