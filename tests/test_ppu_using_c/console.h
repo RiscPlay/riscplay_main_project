@@ -261,5 +261,22 @@ uint32_t get_time(){
 }
 uint32_t get_ps2_controller_state(){
     volatile uint32_t *ps2_controller_ptr = (volatile uint32_t *)0x0000000c;
-    return *ps2_controller_ptr;
+    return ((~(*ps2_controller_ptr))>>16)&(UINT32_C(0xffff));
 }
+
+#define  BUTTON_LEFT_PRESSED(ps2_controller_data)   (((ps2_controller_data)>>7)&UINT32_C(1))
+#define  BUTTON_UP_PRESSED(ps2_controller_data)     (((ps2_controller_data)>>4)&UINT32_C(1))
+#define  BUTTON_DOWN_PRESSED(ps2_controller_data)   (((ps2_controller_data)>>6)&UINT32_C(1))
+#define  BUTTON_RIGHT_PRESSED(ps2_controller_data)   (((ps2_controller_data)>>5)&UINT32_C(1))
+
+#define  BUTTON_X_PRESSED(ps2_controller_data)   (((ps2_controller_data)>>14)&UINT32_C(1))
+#define  BUTTON_SQUARE_PRESSED(ps2_controller_data)   (((ps2_controller_data)>>15)&UINT32_C(1))
+#define  BUTTON_TRIANGLE_PRESSED(ps2_controller_data)   (((ps2_controller_data)>>12)&UINT32_C(1))
+#define  BUTTON_CIRCLE_PRESSED(ps2_controller_data)   (((ps2_controller_data)>>13)&UINT32_C(1))
+
+#define  BUTTON_L1_PRESSED(ps2_controller_data)   (((ps2_controller_data)>>10)&UINT32_C(1))
+#define  BUTTON_L2_PRESSED(ps2_controller_data)   (((ps2_controller_data)>>8)&UINT32_C(1))
+#define  BUTTON_R1_PRESSED(ps2_controller_data)   (((ps2_controller_data)>>11)&UINT32_C(1))
+#define  BUTTON_R2_PRESSED(ps2_controller_data)   (((ps2_controller_data)>>9)&UINT32_C(1))
+
+
