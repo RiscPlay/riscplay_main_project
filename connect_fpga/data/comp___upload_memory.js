@@ -187,7 +187,7 @@ function comp___upload_memory(options) {
             this.data_total_words = data.length;
             try {
                 this.error = false;
-                sendUINT32ArrayToSDRAM(data, start_addr = addr, (n) => { this.data_words_sent = n });
+                await sendUINT32ArrayToSDRAM(data, start_addr = addr, (n) => { this.data_words_sent = n });
                 this.error = false;
             }
             catch (e) {

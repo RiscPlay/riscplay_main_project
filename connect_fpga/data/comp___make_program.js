@@ -171,7 +171,7 @@ function comp___make_program(options) {
             //this.data_total_words = data.length;
             try {
                 this.error = false;
-                sendUINT32ArrayToSDRAM(data, start_addr = addr, (n) => update_progress(n));
+                await sendUINT32ArrayToSDRAM(data, start_addr = addr, (n) => update_progress(n));
                 this.error = false;
             }
             catch (e) {
