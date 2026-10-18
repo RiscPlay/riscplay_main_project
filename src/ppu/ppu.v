@@ -422,7 +422,7 @@ always @(posedge clk) begin
                     addr_sdram<=addr_sdram+21'h1;
                     n_pixels_written_to_frame_buffer_line<=n_pixels_written_to_frame_buffer_line+8'h01;
                     addr_sdram_manager__pixel_ppu[21:13]<=9'b100000001;
-                    if(n_pixels_stored_in_sdram<length_sprite_buffer__latch && posix_in_screen>= 9'sd0 && posiy_in_screen>= 8'sd0 && posiy_in_screen<size_y_screen && posix_in_screen<size_x_screen)  begin
+                    if(n_pixels_stored_in_sdram<length_sprite_buffer__latch && posix_in_screen>= 10'sd0 && posiy_in_screen>= 9'sd0 && posiy_in_screen<size_y_screen && posix_in_screen<size_x_screen)  begin
                         if(dout_sdram_manager__pixel_ppu[31:24]!=8'hff && dout_sdram_manager__pixel_ppu[27:24]!=sprit_id) begin
                             `ifdef ___COLISSION___ 
                                 collision_happened=1'b1;
@@ -471,7 +471,7 @@ always @(posedge clk) begin
                             state<=STATE_RENDER_SPRITE_TO_SDRAM_P5;
                         end
                         posix_in_screen<=inittial__posix_in_screen;
-                        posiy_in_screen<=posiy_in_screen+8'sd1;
+                        posiy_in_screen<=posiy_in_screen+9'sd1;
                     end
                     else begin 
                         state<=STATE_RENDER_SPRITE_TO_SDRAM_P2;
@@ -513,7 +513,7 @@ always @(posedge clk) begin
                     if(n_pixels_stored_in_sdram<length_sprite_buffer__latch) 
                         n_pixels_stored_in_sdram<=n_pixels_stored_in_sdram+16'h0001;
                     
-                    posix_in_screen<=posix_in_screen+9'sd1;
+                    posix_in_screen<=posix_in_screen+10'sd1;
 
                     
                 end
