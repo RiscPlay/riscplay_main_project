@@ -94,8 +94,8 @@ wire inv_y_during_render=cmd_to_process[0];
 reg  [31:0] pallet [0:255];
 reg signed [9:0] posix_in_screen;
 reg signed [8:0] posiy_in_screen;
-localparam [9:0] size_x_screen = 10'sd320;
-localparam [8:0] size_y_screen = 9'sd180;
+localparam signed [9:0] size_x_screen = 10'sd320;
+localparam signed [8:0] size_y_screen = 9'sd180;
 
 
 
@@ -470,8 +470,11 @@ always @(posedge clk) begin
                             last_n_pixels_written_to_sdram[6:0]<=pointer_to_get_data_from_sdram[6:0];
                             state<=STATE_RENDER_SPRITE_TO_SDRAM_P5;
                         end
-                        posix_in_screen<=inittial__posix_in_screen;
-                        posiy_in_screen<=posiy_in_screen+9'sd1;
+                        // Advance Y only after the entire sprite row, not after a 64-pixel batch.
+                        if (n_pixels_written_to_frame_buffer_line == current_sprite_width) begin
+                            posix_in_screen <= inittial__posix_in_screen;
+                            posiy_in_screen <= posiy_in_screen + 9'sd1;
+                        end
                     end
                     else begin 
                         state<=STATE_RENDER_SPRITE_TO_SDRAM_P2;
