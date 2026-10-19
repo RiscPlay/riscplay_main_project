@@ -457,7 +457,8 @@ always @(posedge clk) begin
             end
             STATE_RENDER_SPRITE_TO_SDRAM_P4: begin
                 wre_sdram_manager__pixel_ppu<=1'b0;
-
+                    
+            
                 if(sync__state) begin 
                     if(
                         pointer_to_get_data_from_sdram[6:0]==7'b1000000 || (n_pixels_stored_in_sdram==length_sprite_buffer__latch) ||
@@ -469,11 +470,6 @@ always @(posedge clk) begin
                             wre_sdram_manager__pixel_ppu<=1'b1;
                             last_n_pixels_written_to_sdram[6:0]<=pointer_to_get_data_from_sdram[6:0];
                             state<=STATE_RENDER_SPRITE_TO_SDRAM_P5;
-                        end
-                        // Advance Y only after the entire sprite row, not after a 64-pixel batch.
-                        if (n_pixels_written_to_frame_buffer_line == current_sprite_width) begin
-                            posix_in_screen <= inittial__posix_in_screen;
-                            posiy_in_screen <= posiy_in_screen + 9'sd1;
                         end
                     end
                     else begin 
@@ -511,14 +507,11 @@ always @(posedge clk) begin
                         
                         
                     end
-                   
-
                     if(n_pixels_stored_in_sdram<length_sprite_buffer__latch) 
                         n_pixels_stored_in_sdram<=n_pixels_stored_in_sdram+16'h0001;
                     
                     posix_in_screen<=posix_in_screen+10'sd1;
 
-                    
                 end
             end
             STATE_RENDER_SPRITE_TO_SDRAM_P5: begin
@@ -532,10 +525,14 @@ always @(posedge clk) begin
                         addr_sdram<=addr_sdram_to_start_current_line+21'd320;
                         addr_sdram_to_start_current_line<=addr_sdram_to_start_current_line+21'd320;
                         `endif
+                        posix_in_screen <= inittial__posix_in_screen;
+                        posiy_in_screen <= posiy_in_screen + 9'sd1;
                     end
                     else begin
                         addr_sdram<=addr_sdram_prev+last_n_pixels_written_to_sdram;
                     end
+
+                      
                 end
                 if(sync__state && time_that_stage_hold>8'h01) begin
                     wre_sdram_manager__pixel_ppu<=1'b0;
