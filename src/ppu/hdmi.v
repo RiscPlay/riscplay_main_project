@@ -1,0 +1,164 @@
+
+module HDMI(
+    `ifndef            __RTL_SIMULATION__
+        output             O_tmds_clk_p    ,
+        output             O_tmds_clk_n    ,
+        output      [2:0]  O_tmds_data_p   ,//{r,g,b}
+        output      [2:0]  O_tmds_data_n   ,
+        input  wire        serial_clk,
+        input              I_rst,
+    `endif
+
+    output wire [21:0] addr_sdram_manager__hdmi_controller,
+    output wire [31:0] din_sdram_manager__hdmi_controller,
+    input  wire [31:0] dout_sdram_manager__hdmi_controller,
+    output wire        wre_sdram_manager__hdmi_controller,
+    input  wire        processing_request_from__hdmi_controller,
+    input  wire [6:0]  n_32bits_words_processed_by_current_hdmi_request,
+    input  wire        pix_clk,  
+    input  wire        pll_lock,
+    input  wire        hdmi4_rst_n,
+    input  wire        rst_n_paint,
+    input  wire        set_addr_to_frame_buffer,
+    input  wire [20:0] addr_to_frame_buffer,
+    input  wire [20:0] fb_horizontal_offset__input,
+    output reg         set_addr_to_frame_buffer__ack,
+    output wire        hdmi_ctrl_is_standby,
+    `ifdef            __RTL_SIMULATION__
+        output  wire [23:0] rgb_hdmi,
+
+    `endif
+    input  wire        I_clk
+);
+`ifndef            __RTL_SIMULATION__
+    wire        I_rst_n;
+    assign      I_rst_n = ~I_rst;
+`endif
+
+
+
+`ifndef            __RTL_SIMULATION__
+    //--------------------------
+    wire        tp0_vs_in  ;
+    wire        tp0_hs_in  ;
+    wire        tp0_de_in ;
+    wire [ 7:0] tp0_data_r/*synthesis syn_keep=1*/;
+    wire [ 7:0] tp0_data_g/*synthesis syn_keep=1*/;
+    wire [ 7:0] tp0_data_b/*synthesis syn_keep=1*/;
+`else 
+    wire [ 7:0] tp0_data_r;
+    wire [ 7:0] tp0_data_g;
+    wire [ 7:0] tp0_data_b;
+    assign rgb_hdmi={tp0_data_r,tp0_data_g,tp0_data_b};
+`endif
+
+reg         vs_r;
+reg  [9:0]  cnt_vs;
+
+//------------------------------------
+//HDMI4 TX
+
+
+reg [31:0]  counter_init;
+reg [2:0]  mode_reg1;
+always @(posedge pix_clk ) begin
+    if(pll_lock==1'b1) begin
+        
+        if(counter_init>32'h000ff000) begin
+            counter_init<=32'h00000000;
+            if(mode_reg1!=3'b110)
+                mode_reg1<=mode_reg1+3'b001;
+
+        end
+        else begin
+            counter_init<=counter_init+32'h00000001;
+        end
+    
+    end
+    else begin
+        counter_init<=32'h00000000;
+        mode_reg1<=3'b000;
+    end
+end
+//===========================================================================
+Pixel_Generator Pixel_Generator_inst
+(
+    .I_pxl_clk   (pix_clk            ),//pixel clock
+    .I_rst_n     (hdmi4_rst_n        ),//low active 
+    .I_mode      (mode_reg1          ),//data select
+    .I_single_r  (8'd0               ),
+    .I_single_g  (8'd255             ),
+    .I_single_b  (8'd0               ),                  //800x600    //1024x768   //1280x720    
+    .I_h_total   (12'd1650           ),//hor total time  // 12'd1056  // 12'd1344  // 12'd1650  
+    .I_h_sync    (12'd40             ),//hor sync time   // 12'd128   // 12'd136   // 12'd40    
+    .I_h_bporch  (12'd220            ),//hor back porch  // 12'd88    // 12'd160   // 12'd220   
+    .I_h_res     (12'd1280           ),//hor resolution  // 12'd800   // 12'd1024  // 12'd1280  
+    .I_v_total   (12'd750            ),//ver total time  // 12'd628   // 12'd806   // 12'd750    
+    .I_v_sync    (12'd5              ),//ver sync time   // 12'd4     // 12'd6     // 12'd5     
+    .I_v_bporch  (12'd20             ),//ver back porch  // 12'd23    // 12'd29    // 12'd20    
+    .I_v_res     (12'd720            ),//ver resolution  // 12'd600   // 12'd768   // 12'd720    
+    .I_hs_pol    (1'b1               ),//HS polarity , 0:negetive ploarity，1：positive polarity
+    .I_vs_pol    (1'b1               ),//VS polarity , 0:negetive ploarity，1：positive polarity
+    `ifndef            __RTL_SIMULATION__
+
+        .O_de        (tp0_de_in          ),   
+        .O_hs        (tp0_hs_in          ),
+        .O_vs        (tp0_vs_in          ),
+    `endif
+
+    .O_data_r    (tp0_data_r         ),   
+    .O_data_g    (tp0_data_g         ),
+    .O_data_b    (tp0_data_b         ),
+    .rst_n_paint(rst_n_paint),
+    .addr_sdram_manager__hdmi_controller(addr_sdram_manager__hdmi_controller),
+    .din_sdram_manager__hdmi_controller(din_sdram_manager__hdmi_controller),
+    .dout_sdram_manager__hdmi_controller(dout_sdram_manager__hdmi_controller),
+    .wre_sdram_manager__hdmi_controller(wre_sdram_manager__hdmi_controller),
+    .processing_request_from__hdmi_controller(processing_request_from__hdmi_controller),
+    .set_addr_to_frame_buffer__ack(set_addr_to_frame_buffer__ack),
+    .addr_to_frame_buffer(addr_to_frame_buffer),
+    .fb_horizontal_offset__input(fb_horizontal_offset__input),
+    .set_addr_to_frame_buffer(set_addr_to_frame_buffer),
+    .n_32bits_words_processed_by_current_hdmi_request(n_32bits_words_processed_by_current_hdmi_request),
+    .hdmi_ctrl_is_standby(hdmi_ctrl_is_standby)
+);
+`ifndef            __RTL_SIMULATION__
+    always@(posedge pix_clk)
+    begin
+        vs_r<=tp0_vs_in;
+    end
+    always@(posedge pix_clk or negedge hdmi4_rst_n)
+    begin
+        if(!hdmi4_rst_n)
+            cnt_vs<=0;
+        else if(vs_r && !tp0_vs_in) //vKEY4 falling edge
+            cnt_vs<=cnt_vs+1'b1;
+    end 
+`endif
+
+//==============================================================================
+//TMDS TX(HDMI4)
+`ifndef            __RTL_SIMULATION__
+
+    assign hdmi4_rst_n =  I_rst_n &pll_lock;
+
+
+
+    DVI_TX_Top DVI_TX_Top_inst
+    (
+        .I_rst_n       (hdmi4_rst_n   ),  //asynchronous reset, low active
+        .I_serial_clk  (serial_clk    ),
+        .I_rgb_clk     (pix_clk       ),  //pixel clock
+        .I_rgb_vs      (tp0_vs_in     ), 
+        .I_rgb_hs      (tp0_hs_in     ),    
+        .I_rgb_de      (tp0_de_in     ), 
+        .I_rgb_r       (  tp0_data_r ),  //tp0_data_r
+        .I_rgb_g       (  tp0_data_g  ),  
+        .I_rgb_b       (  tp0_data_b  ),  
+        .O_tmds_clk_p  (O_tmds_clk_p  ),
+        .O_tmds_clk_n  (O_tmds_clk_n  ),
+        .O_tmds_data_p (O_tmds_data_p ),  //{r,g,b}
+        .O_tmds_data_n (O_tmds_data_n )
+    );
+`endif
+endmodule

@@ -1,0 +1,1 @@
+Set-Alias pio "$env:USERPROFILE\.platformio\penv\Scripts\pio.exe"

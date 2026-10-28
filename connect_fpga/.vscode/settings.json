@@ -1,0 +1,8 @@
+{
+  "[html]": {
+    "editor.defaultFormatter": "vscode.html-language-features"
+  },
+  "[javascript]": {
+    "editor.formatOnSave": true
+  }
+}

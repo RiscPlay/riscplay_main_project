@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" data-bs-core="modern" data-bs-theme="dark">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ESP32 HEX API</title>
+
+  <script src="alpinejs.js" defer></script>
+
+  <!-- Halfmoon CSS -->
+  <link href="halfmoon.min.css" rel="stylesheet">
+
+  <!-- Halfmoon modern core theme -->
+  <link href="halfmoon.modern.css" rel="stylesheet">
+  <script src="halfmoon.min.js"></script>
+  <script src="bmplib.js"></script>
+
+  <script src="htmx.min.js" defer></script>
+</head>
+
+<body x-data="App()">
+
+  <div class="page-wrapper">
+    <div class="container px-3 px-sm-4 px-xl-5">
+      <div class="row">
+        <div class="col py-3 py-sm-4">
+          <h1>Control PlayRisc Processor</h1>
+        </div>
+      </div>
+      <div class="row">
+        <div class="col" x-data="comp___upload_memory(
+            {
+              addr_serv: this.addr_serv, 
+              addr_mem:toHex32(0x20000000),
+              label: 'Upload Program',
+              type: COMP___UPLOAD_MEMORY__IS_FILE,
+              block_input_value: true
+            })"
+          hx-get="comp___upload_memory.html"  hx-trigger="load">
+        </div>
+      </div>
+      <div class="row py-5">
+        <div class="col" hx-get="comp___view_memory.html" hx-trigger="load">
+        </div>
+      </div>
+      <div class="row py-2">
+        <div class="col" hx-get="edit_sdram.html" hx-trigger="load">
+        </div>
+      </div>
+      <div class="row py-2">
+        <div class="col" x-data="comp___upload_memory(
+            {
+              addr_serv: this.addr_serv, 
+              label: 'Upload Sprite',
+              type: COMP___UPLOAD_MEMORY__IS_SPRITE
+            })"
+          hx-get="comp___upload_memory.html"  hx-trigger="load">
+        </div>
+      </div>
+
+      <div class="row py-2">
+        <div class="col" x-data="comp___make_program(
+            {
+              addr_serv: this.addr_serv
+            }
+        )" hx-get="comp___make_program.html"  hx-trigger="load">
+        </div>
+      </div>
+      <div class="row py-1">
+        <div class="col"  hx-get="comp___manual_clk.html"  hx-trigger="load"></div>
+      </div>
+    </div>
+  </div>
+  <script>
+    var addr_serv = ""
+
+    function toHex32(value) {
+      return (value >>> 0).toString(16).padStart(8, "0");
+    }
+
+    
+    const COMP___UPLOAD_MEMORY__IS_FILE = 0;
+    const COMP___UPLOAD_MEMORY__IS_SPRITE = 1;
+    const COMP___UPLOAD_MEMORY__IS_IMAGE = 2;
+
+    function uuidv4() {
+        const bytes = new Uint8Array(16);
+        crypto.getRandomValues(bytes);
+
+        // UUID version 4
+        bytes[6] = (bytes[6] & 0x0f) | 0x40;
+
+        // UUID variant
+        bytes[8] = (bytes[8] & 0x3f) | 0x80;
+
+        return [...bytes]
+            .map((b, i) => {
+                const hex = b.toString(16).padStart(2, '0');
+                return [4, 6, 8, 10].includes(i) ? '-' + hex : hex;
+            })
+            .join('');
+    }
+    function split512(str) {
+      let chunks = [];
+
+      for (let i = 0; i < str.length; i += 512) {
+        chunks.push(str.slice(i, i + 512));
+      }
+
+      return chunks;
+    }
+
+    function formatSignedFixed16bits(num) {
+      const sign = num >= 0 ? '+' : '-';
+      const abs = Math.abs(Math.trunc(num));
+
+      return sign + String(abs).padStart(5, '0');;
+    }
+
+    function formatSignedFixed8bits(num) {
+      const sign = num >= 0 ? '+' : '-';
+      const abs = Math.abs(Math.trunc(num));
+
+      return sign + String(abs).padStart(3, '0');
+    }
+
+    function hexToSigned16Pair(hexStr) {
+      var hexStr2 = hexStr[7] + hexStr[8] + hexStr[5] + hexStr[6] + "_" + hexStr[2] + hexStr[3] + hexStr[0] + hexStr[1];
+      // Remove underscore if present
+      hexStr2 = hexStr2.replace(/_/g, '');
+
+      // Parse as 32-bit unsigned number
+      const value = parseInt(hexStr2, 16) >>> 0;
+
+      // Extract high and low 16 bits
+      let high = (value >>> 16) & 0xFFFF;
+      let low = value & 0xFFFF;
+
+      // Convert to signed 16-bit
+      if (high & 0x8000) high -= 0x10000;
+      if (low & 0x8000) low -= 0x10000;
+
+      return {
+        high: formatSignedFixed16bits(high),
+        low: formatSignedFixed16bits(low)
+      };
+    }
+
+    function hexToSigned8Array(hexStr) {
+      // Remove underscores
+      var hexStr2 = hexStr[7] + hexStr[8] + hexStr[5] + hexStr[6] + "_" + hexStr[2] + hexStr[3] + hexStr[0] + hexStr[1];
+
+      hexStr2 = hexStr2.replace(/_/g, '');
+
+      // Parse as 32-bit unsigned
+      const value = parseInt(hexStr2, 16) >>> 0;
+
+      // Extract 4 bytes (big-endian order)
+      let bytes = [
+        (value >>> 24) & 0xFF,
+        (value >>> 16) & 0xFF,
+        (value >>> 8) & 0xFF,
+        value & 0xFF
+      ];
+
+      // Convert each to signed 8-bit
+      return bytes.map(b => (b & 0x80) ? formatSignedFixed8bits(b - 0x100) : formatSignedFixed8bits(b));
+    }
+    async function send_64_words_32bits_to_sdram_buffer(data) {
+      var addr_hex_to_set_buffer = toHex32((1<<28)+(1 << 22) + (0x101 << 13)); //0b11000000010000000000000
+      var addr_hex_to_set_buffer_hex32 = toHex32(addr_hex_to_set_buffer);
+      var data_to_send = ""
+      for (let j = 0; j < data.length; j++) {
+        data_to_send = data_to_send + toHex32(data[j])
+      }
+      try {
+        var response = await fetch(addr_serv + "/send_data", {
+          method: "POST",
+          body: addr_hex_to_set_buffer + data_to_send
+        });
+        if(response.status!=200){
+          throw new Error("Code " + code + " returned from endpoint: " +addr_serv+"/send_data, the expected is 200");
+
+        }
+      } catch (e){
+        return Erro("Error to connect to endpoint: "+addr_serv + "/send_data");
+      }
+    }
+    async function send_buffer_to_sdram(length, addr_sdram) {
+      var op_write = 1;
+      var data_len = length;
+      var data_to_send = toHex32((addr_sdram << 9) + (data_len << 2) + op_write);
+      addr_hex_to_set_buffer = toHex32( (1<<28)+(1 << 22) + (1 << 21));
+      try {
+        var response = await fetch(addr_serv + "/send_data", {
+          method: "POST",
+          body: addr_hex_to_set_buffer + data_to_send
+        });
+        if(response.status!=200){
+          throw new Error("Code " + code + " returned from endpoint: " +addr_serv+"/send_data, the expected is 200");
+
+        }
+      } catch (e){
+        return Erro("Error to connect to endpoint: "+addr_serv + "/send_data");
+      }
+    }
+
+    async function sendUINT32ArrayToSDRAM(uint32_array_to_send,start_addr=0,progress_monitor_function=null) {
+      var n_data_sent=0;
+      for (let i = 0; i < uint32_array_to_send.length; i = i + 64) {
+
+        var data_to_send=uint32_array_to_send.slice(i, i + 64)
+        await send_64_words_32bits_to_sdram_buffer(data_to_send);
+        await send_buffer_to_sdram(data_to_send.length, start_addr+i);
+        n_data_sent=n_data_sent+data_to_send.length;
+        if(progress_monitor_function!=null) 
+          progress_monitor_function(n_data_sent);
+      }
+      return true;
+    }
+    const FUNCTION__ENABLE_OR_STOP_PROCESSOR___STOP_PROCESSOR=true;
+    const FUNCTION__ENABLE_OR_STOP_PROCESSOR___ENABLE_PROCESSOR=false; 
+    async function enable_or_stop_processor(stop_processor) {
+      let endpoint="/stop_processor";
+      if(stop_processor==false){
+        endpoint="/enable_processor"
+      }
+      try {
+        var response = await fetch(addr_serv + endpoint, {
+            method: "GET",
+        });
+      } catch {
+        throw new Error("Error to access the endpoint " + addr_serv+endpoint);
+      }
+      var code = response.status;
+      if (code != 200) {
+        throw new Error("Code " + code + " returned from endpoint: " +addr_serv+endpoint+", the expected is 200");
+        
+      }
+      return true;
+    }
+    function App() {
+      return {
+        error: false,
+        error_msg:"",
+        sdram_buffer_write: new Array(64).fill(0),
+
+        
+
+        async sendBuffer(sdram_addr_to_write_buffer) {
+          var addr_sdram = parseInt(sdram_addr_to_write_buffer, 16);
+          var sdram_buffer_write_int=new Uint32Array(this.sdram_buffer_write.length);
+          for(let i=0;i<this.sdram_buffer_write.length;i++){
+            sdram_buffer_write_int[i]=parseInt(this.sdram_buffer_write[i], 16);
+          }
+          try{
+            await send_64_words_32bits_to_sdram_buffer(sdram_buffer_write_int);
+            await send_buffer_to_sdram(this.sdram_buffer_write.length, addr_sdram);
+          }
+          catch(e){
+            this.error=true;
+            this.error_msg=e.message;
+          }
+        },
+        async getSDRAM(sdram_addr_to_get_data) {
+
+          var op_read = 0;
+          var data_len = this.sdram_buffer_write.length;
+          var addr_sdram = parseInt(sdram_addr_to_get_data, 16);
+          var data_to_send = toHex32((addr_sdram << 9) + (data_len << 2) + op_read);
+          addr_hex_to_set_buffer = toHex32((1<<28)+(1 << 22) + (1 << 21));
+          try {
+            var response = await fetch(addr_serv + "/send_data", {
+              method: "POST",
+              body: addr_hex_to_set_buffer + data_to_send
+            });
+          } catch {
+            this.error = true;
+            return;
+          }
+        }
+      }
+    }
+  </script>
+  <script src="comp___make_program.js"></script>
+  <script src="comp___view_memory.js"></script>
+  <script src="comp___input_field_hexa.js"></script>
+  <script src="comp___upload_memory.js"></script>
+  <script src="comp___manual_clk.js"></script>
+  <script src="comp___view_memory.js"></script>
+
+  <script src="bootstrap.bundle.min.js"></script>
+</body>
+
+</html>
