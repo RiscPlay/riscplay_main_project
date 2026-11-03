@@ -2,7 +2,7 @@ module spi (
     input   wire            clk,
     input   wire            lock_pll,
     input   wire            sclk,
-    input   wire            cs,
+    input   wire            cs_input,
     input   wire            mosi,
     output  wire            miso,
     output  wire  [1:0]     sel___main_memory,
@@ -12,13 +12,22 @@ module spi (
     output  wire            wre_main_memory___recvdata0,
     input   wire  [31:0]    dout_mapper,
     output  wire            spi_comm_started,
-    input   wire            spi_can_access_memory
+    input   wire            spi_can_access_memory,
+    input   wire            rx,
+    output  wire            tx,
+    output  wire  [5:0]     leds
 );
 
-
+`define __USE_UART__COM__
 
 wire finish_calc_crc____for_consumer_spi_mods;
-
+wire cs;
+`ifndef __USE_UART__COM__
+    assign cs=cs_input;
+`else 
+    reg cs_intern;
+    assign cs=cs_intern;
+`endif
 
 wire wr_req__spi_slave;
 wire rd_req__spi_slave;
@@ -74,6 +83,7 @@ senddata senddata0 (
     .rd_req_fifo(mux__rd_req__consumer_spi[ID_MODULE____SEND_DATA]),
     .rd_ready_fifo(mux__rd_ready__consumer_spi[ID_MODULE____SEND_DATA]),
     .empty_fifo(mux__empty__consumer_spi[ID_MODULE____SEND_DATA]),
+    .wr_empty_fifo(empty__spi_slave),
     .data_line_from_write_fifo(mux__dout__consumer_spi[ID_MODULE____SEND_DATA]),
     .wr_req_fifo(mux__wr_req__consumer_spi[ID_MODULE____SEND_DATA]),
     .wr_ready_fifo(mux__wr_ready__consumer_spi[ID_MODULE____SEND_DATA]),
@@ -95,7 +105,14 @@ senddata senddata0 (
 
     .addr_main_memory(addr_main_memory___senddata0),
     .dout_main_memory(dout_mapper),
-    .spi_can_access_memory(spi_can_access_memory)
+    .spi_can_access_memory(spi_can_access_memory),
+    .leds_output(leds),
+    `ifdef __USE_UART__COM__
+    .using_uart(1'b1)
+    `else
+    .using_uart(1'b0)
+    `endif 
+
 );
 
 recvdata recvdata0 (
@@ -163,7 +180,7 @@ consumer_spi #(N_BITS_TO_ADDRESS_MODULES,N_MODULES) consumer_spi_0
     .sel___main_memory(sel___main_memory),
     .spi_comm_started(spi_comm_started)
 );
-
+`ifndef __USE_UART__COM__
 spi_slave spi_slave_0(
     .clk(clk),
     .rst_n((~cs)&lock_pll),
@@ -182,7 +199,25 @@ spi_slave spi_slave_0(
     .busy_from_write_fifo(busy___fifo_spi_slave_write__and__fifo_spi_consumer_read),
     .busy_from_read_fifo(busy___fifo_spi_slave_read__and__fifo_spi_consumer_write)
 );
+`else
+uart_slave uart_slave_0(
+    .clk(clk),
+    .rst_n((~cs)&lock_pll),
+    .uart_rxd(rx),
+    .uart_txd(tx),
+    .data_line_from_read_fifo(din__spi_slave),
+    .rd_req_fifo(rd_req__spi_slave),
+    .rd_ready_fifo(rd_ready__spi_slave),
+    .empty_fifo(empty__spi_slave),
+    .data_line_from_write_fifo(dout__spi_slave),
+    .wr_req_fifo(wr_req__spi_slave),
+    .wr_ready_fifo(wr_ready__spi_slave),
+    .full_fifo(full__spi_slave),
+    .busy_from_write_fifo(busy___fifo_spi_slave_write__and__fifo_spi_consumer_read),
+    .busy_from_read_fifo(busy___fifo_spi_slave_read__and__fifo_spi_consumer_write)
 
+);
+`endif
 crc32_fsm crc32__consumer_spi (
     .clk(clk),
     .rst_n((~cs)&lock_pll),
@@ -227,5 +262,24 @@ fifo fifo_spi_slave_write__and__fifo_spi_consumer_read(
         .full(full__spi_slave),
         .busy(busy___fifo_spi_slave_write__and__fifo_spi_consumer_read)
 );
+`ifdef __USE_UART__COM__
+    reg spi_comm_started_prev;
+    always @(posedge clk) begin
+        if(lock_pll==1'b0) begin
+            cs_intern<=1'b0;
+            spi_comm_started_prev<=1'b0;
+        end
+        else begin
+            spi_comm_started_prev<=spi_comm_started;
+            if(spi_comm_started_prev==1'b1 && spi_comm_started==1'b0) begin
+                cs_intern<=1'b1;
+            end
+            else begin
+                cs_intern<=1'b0;
+            end
+        end
+    end
+`endif
+
 
 endmodule

@@ -32,7 +32,9 @@ module consumer_spi
     output reg  [63:0] op_args,
 
     output reg [1:0] sel___main_memory,
-    output reg       spi_comm_started
+    output reg       spi_comm_started,
+    output wire [5:0]     leds_output
+
 );
 
 
@@ -90,8 +92,9 @@ reg write_fifo;
 reg write_fifo_processed;
 reg read_fifo;
 reg read_fifo_processed;
-
-
+reg [5:0] leds=6'b111000;
+assign leds_output=leds;
+reg state___GET_CRC_FROM_MODULE___achived;
 reg msg_for_when_crc_is_ok;
 reg sending_crc_resulted_from_module_op;
 wire [N_BITS_TO_ADDRESS_MODULES-1:0] op_selected= op[N_BITS_TO_ADDRESS_MODULES-1:0];
@@ -118,6 +121,7 @@ always @(posedge clk) begin
         sending_crc_resulted_from_module_op<=1'b0;
         sel___main_memory<=2'b0000;
         spi_comm_started<=1'b0;
+        state___GET_CRC_FROM_MODULE___achived<=1'b0;
         state<=STATE__RESET;
     end
     else begin
@@ -155,8 +159,8 @@ always @(posedge clk) begin
             end
             STATE__IDLE:
             begin
-                spi_comm_started<=1'b1;
                 if(~empty_fifo & ~busy_from_read_fifo) begin
+                    spi_comm_started<=1'b1;
                     read_fifo<=1'b1;
                     if(n_bytes_recv_from_fifo_to_define_of_op_args<4'h8) begin
                         state<=STATE__RECEIVE_OP_AND_ARGS;
@@ -230,6 +234,9 @@ always @(posedge clk) begin
                     end
                 end
                 else begin
+                    //if(state___GET_CRC_FROM_MODULE___achived) begin
+                     //   leds<=6'b000111;
+                    //end
                     write_fifo<=1'b0;
                     state<=STATE__RECV_CRC;
                 end
@@ -324,10 +331,12 @@ always @(posedge clk) begin
                 awake_module[op[N_BITS_TO_ADDRESS_MODULES-1:0]]<=1'b1;
                 state<=STATE__WAIT_MODULE_STOP;
                 sel___main_memory<=op[N_BITS_TO_ADDRESS_MODULES-1:0];
+
             end
             STATE__WAIT_MODULE_STOP: begin
                 if(sync__state_buffer) begin
                     if(module_stopped==1'b1) begin
+                        leds<=6'b111110;
                         awake_module[op[N_BITS_TO_ADDRESS_MODULES-1:0]]<=1'b0;
                         module_id_sel<='0;
                         if(op[3]==1'b1) 
@@ -347,6 +356,7 @@ always @(posedge clk) begin
                 state<=STATE__SEND_CRC;
                 finish_calc_crc<=1'b0;
                 sending_crc_resulted_from_module_op<=1'b1;
+                state___GET_CRC_FROM_MODULE___achived<=1'b1;
            end
         endcase
     end

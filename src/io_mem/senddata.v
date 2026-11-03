@@ -8,6 +8,7 @@ module senddata (
     output reg  [7:0]   data_line_from_write_fifo,
     output reg          wr_req_fifo,
     input  wire         wr_ready_fifo,
+    input  wire         wr_empty_fifo,
     input  wire         full_fifo,
     input  wire         busy_from_write_fifo,
     input  wire         busy_from_read_fifo,
@@ -26,7 +27,10 @@ module senddata (
 
     output reg    [31:0] addr_main_memory,
     input  wire   [31:0] dout_main_memory,
-    input  wire          spi_can_access_memory
+    input  wire          spi_can_access_memory,
+    output wire [5:0]     leds_output,
+    input  wire           using_uart
+
 
 );
 
@@ -60,6 +64,8 @@ reg [31:0] addr_main_memory__intern;
 reg [7:0] byte_to_send_to_crc;
 
 reg [15:0] n_elements_sent_to_external_world;
+reg [5:0] leds=6'b111111;
+assign leds_output=leds;
 always @(posedge clk) begin
     if(!rst_n) begin
         n_elements_computed<=16'h0000;
@@ -154,7 +160,16 @@ always @(posedge clk) begin
             STATE_WAIT_CRC_FINISH_P1: begin
                 if(crc_done) begin
                     finish_calc_crc<=1'b0;
-                    state<=STATE_WAIT_TRANSFER_DATA_TO_EXTERNAL_WORLD_P0;
+                    if(using_uart==1'b0) begin
+                    
+                        state<=STATE_WAIT_TRANSFER_DATA_TO_EXTERNAL_WORLD_P0;
+                    end
+                    else begin
+                        if(wr_empty_fifo) begin
+                            state<=STATE_FINISH;
+                            addr_main_memory<=32'h00000000;
+                        end
+                    end
                 end
             end
             STATE_WAIT_TRANSFER_DATA_TO_EXTERNAL_WORLD_P0: begin

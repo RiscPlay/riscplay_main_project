@@ -1,15 +1,16 @@
 `timescale 1ns/1ps
 `include "sdrc_defines.v"
+
 //https://github.com/calint/tang-nano-20k--riscv--cache-sdram
 module top (
     `ifndef            __RTL_SIMULATION__
-        output reg  [5:0]  led,
         input              I_rst           ,
         output             O_tmds_clk_p    ,
         output             O_tmds_clk_n    ,
         output      [2:0]  O_tmds_data_p   ,//{r,g,b}
         output      [2:0]  O_tmds_data_n   ,
         
+
         output            ds_clk2,
         input             ds_miso2,
         output            ds_mosi2,
@@ -19,7 +20,7 @@ module top (
         input             ds_miso,
         output            ds_mosi,
         output            ds_cs,
-        
+
 
 
         // "magic" port names that the Gowin EDA connects to the on-chip SDRAM
@@ -41,9 +42,10 @@ module top (
         output            ds_cs,
         output wire [23:0] rgb_hdmi,
     `endif
-    input              I_clk,
-    inout       [3:0]  GPIO
-
+    input                   I_clk,
+    inout           [3:0]   GPIO,
+    input   wire            rx,
+    output  wire            tx
 );
 wire reset_cpu;
 wire enable;
@@ -402,11 +404,12 @@ assign wre_mapper =
 
 wire spi_comm_started;
 wire spi_can_access_memory;
+`define __USE_UART__COM__
 spi spi_ins (
     .clk(clk),
     .lock_pll(lock_pll),
     .sclk(sclk),
-    .cs(cs),
+    .cs_input(cs),
     .mosi(mosi),
     .miso(miso),
     .sel___main_memory(sel___main_memory),
@@ -416,8 +419,10 @@ spi spi_ins (
     .wre_main_memory___recvdata0(wre_main_memory___recvdata0),
     .dout_mapper(dout_mapper),
     .spi_comm_started(spi_comm_started),
-    .spi_can_access_memory(spi_can_access_memory)
-
+    .spi_can_access_memory(spi_can_access_memory),
+    .rx(rx),
+    .tx(tx)
+    //.leds(led)
 );
 
 
@@ -534,8 +539,8 @@ rv32im_cpu rv32im_cpu_inst(
     .fb_horizontal_offset(fb_horizontal_offset),
     .set_addr_to_frame_buffer__ack(set_addr_to_frame_buffer__ack),
     .ppu_cmd_fifo_is_empity(ppu_cmd_fifo_is_empity),
-    .debug_signal(debug_signal),
-    .leds(led)
+    .debug_signal(debug_signal)
+    //.leds(led)
 
 
 );
@@ -565,6 +570,7 @@ control_cpu control_cpu_ins(
     .enable_cpu(enable),
     .spi_comm_started(spi_comm_started),
     .spi_can_access_memory(spi_can_access_memory)
+    //.leds(led)
     //.clk_out(clk_cpu)
 );
 

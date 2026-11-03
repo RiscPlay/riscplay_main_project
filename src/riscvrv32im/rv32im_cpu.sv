@@ -105,7 +105,7 @@ module rv32im_cpu(
   `ifndef __RTL_SIMULATION__  
   `include "alu_defines.vh"
   `endif
-  `ifdef SIM
+  `ifdef __RTL_SIMULATION__
   `include "riscvrv32im/alu_defines.vh"
   `endif
   
@@ -276,7 +276,7 @@ module rv32im_cpu(
               `ifndef __RTL_SIMULATION__  
               `include "store.vh"
               `endif
-              `ifdef SIM
+              `ifdef __RTL_SIMULATION__
               `include "riscvrv32im/store.vh"
               `endif
               if(sync__state & time_that_stage_hold>8'h00 & (~memory_control___busy)) begin
@@ -293,7 +293,7 @@ module rv32im_cpu(
               `ifndef __RTL_SIMULATION__  
               `include "alu_im.vh"
               `endif
-              `ifdef SIM
+              `ifdef __RTL_SIMULATION__
               `include "riscvrv32im/alu_im.vh"
               `endif
               state <= WRITEBACK;
@@ -308,7 +308,7 @@ module rv32im_cpu(
               `ifndef __RTL_SIMULATION__  
               `include "alu.vh"
               `endif
-              `ifdef SIM
+              `ifdef __RTL_SIMULATION__
               `include "riscvrv32im/alu.vh"
               `endif
               state <= WRITEBACK;
@@ -323,7 +323,7 @@ module rv32im_cpu(
               `ifndef __RTL_SIMULATION__  
               `include "branch.vh"
               `endif
-              `ifdef SIM
+              `ifdef __RTL_SIMULATION__
               `include "riscvrv32im/branch.vh"
               `endif
               state <= WRITEBACK;
@@ -371,7 +371,7 @@ module rv32im_cpu(
               `ifndef __RTL_SIMULATION__  
               `include "alu_fixed_point.vh"
               `endif
-              `ifdef SIM
+              `ifdef __RTL_SIMULATION__
               `include "riscvrv32im/alu_fixed_point.vh"
               `endif
               state <= WRITEBACK;
@@ -386,7 +386,7 @@ module rv32im_cpu(
               `ifndef __RTL_SIMULATION__  
               `include "control_ppu.vh"
               `endif
-              `ifdef SIM
+              `ifdef __RTL_SIMULATION__
               `include "riscvrv32im/control_ppu.vh"
               `endif
             end
@@ -407,7 +407,7 @@ module rv32im_cpu(
               `ifndef __RTL_SIMULATION__  
               `include "load.vh"
               `endif 
-              `ifdef SIM
+              `ifdef __RTL_SIMULATION__
               `include "riscvrv32im/load.vh"
               `endif 
               `ifdef SIM

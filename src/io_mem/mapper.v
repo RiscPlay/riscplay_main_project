@@ -113,7 +113,7 @@ assign dout_mapper =
     sel_main                   ? dout_main_memory :
     sel_control                ? dout_control_cpu_memory :
     sel_colision               ? collision_in_group :
-    sel_sdram                  ? dout_sdram_manager :
+    //sel_sdram                  ? dout_sdram_manager :
     sel_ps2_buttons            ? {16'h0,ps2_buttons}:
     sel_centisecond_count      ? {centisecond_tick_count} :
     sel_sprite                 ? {24'h0, out_from_sprite_buffer__cpu} :

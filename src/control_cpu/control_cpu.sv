@@ -51,6 +51,8 @@ always @(posedge clk) begin
         spi_can_access_memory<=1'b0;
         count_to_allow_the_cpu_use_mem<=4'h0;
         enable_cpu<=1'b1;
+        leds<=6'b111111;
+        state_control_mem_access<=STATE__IDLE;
     end
     else begin
         spi_comm_started_prev<=spi_comm_started;
@@ -62,6 +64,8 @@ always @(posedge clk) begin
                 if(spi_comm_started_prev==1'b0 && spi_comm_started==1'b1) begin
                     state_control_mem_access<=STATE__WAIT_CPU_TO_COMPLETE_OPS_IN_MEM;
                     enable_cpu<=1'b0;
+                    leds<=6'b0;
+
                 end
                 else if(spi_comm_started_prev==1'b1 && spi_comm_started==1'b0) begin
                     state_control_mem_access<=STATE__WAIT_CPU_RESTORE_OPS_IN_MEM;
@@ -81,6 +85,8 @@ always @(posedge clk) begin
                 if(count_to_allow_the_cpu_use_mem==4'hf) begin
                     enable_cpu<=1'b1;
                     state_control_mem_access<=STATE__IDLE;
+                    leds<=6'b111111;
+
                 end
                 else begin
                     count_to_allow_the_cpu_use_mem<=count_to_allow_the_cpu_use_mem+4'h1;
