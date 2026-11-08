@@ -1,3 +1,33 @@
+async function recv_data_from_endpoint_http_or_uart(addr_serv, addr_hex, length) {
+    if (addr_serv !== __UART_ADDR__) {
+        try {
+            const res = await fetch(addr_serv + "/recv_data?n=" + (length) + "&addr=" + addr_hex);
+            total_recv = total_to_req + total_recv;
+            const buffer = await res.arrayBuffer();
+            const bytes = new Uint8Array(buffer);
+            return bytes;
+        }
+        catch {
+            return null;
+        }
+    }
+    else {
+        const addr = parseInt(addr_hex, 16) >>> 0;
+        try {
+            let ret = await uart_protocol.recv_uint8_vector_from_fpga(addr, length);
+            if (ret.success == false) {
+                return null;
+            }
+            else {
+                return ret.body;
+            }
+        }
+        catch {
+            return null;
+        }
+    }
+}
+
 function comp___view_memory(options) {
     return {
         memory: [],
@@ -64,11 +94,9 @@ function comp___view_memory(options) {
                 var total_to_req = 0;
                 if ((this.amount_to_read - total_recv) > 64) total_to_req = 64;
                 else total_to_req = this.amount_to_read - total_recv;
-                const res = await fetch(addr_serv + "/recv_data?n=" + (total_to_req * 4) + "&addr=" + initial_addr);
+                const res = await recv_data_from_endpoint_http_or_uart(addr_serv, initial_addr, (total_to_req * 4));
                 total_recv = total_to_req + total_recv;
-                const buffer = await res.arrayBuffer();
-
-                const bytes = new Uint8Array(buffer);
+                const bytes = res;
 
                 const hex = Array.from(bytes).map(b =>
                     b.toString(16).padStart(2, '0').toUpperCase()

@@ -224,6 +224,7 @@ module rv32im_cpu(
       debug_signal<=32'h00000000;
       wr_en__fb<=1'b0;
       wr_data__fb<=21'h0;
+      set_addr_to_frame_buffer<=1'b0;
 
     end
 

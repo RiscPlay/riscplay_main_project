@@ -28,7 +28,11 @@ module HDMI(
         output  wire [23:0] rgb_hdmi,
 
     `endif
-    input  wire        I_clk
+    input  wire        I_clk,
+    output wire [31:0] debug_signal,
+    output  wire    [5:0]   leds
+
+
 );
 `ifndef            __RTL_SIMULATION__
     wire        I_rst_n;
@@ -120,7 +124,9 @@ Pixel_Generator Pixel_Generator_inst
     .fb_horizontal_offset__input(fb_horizontal_offset__input),
     .set_addr_to_frame_buffer(set_addr_to_frame_buffer),
     .n_32bits_words_processed_by_current_hdmi_request(n_32bits_words_processed_by_current_hdmi_request),
-    .hdmi_ctrl_is_standby(hdmi_ctrl_is_standby)
+    .hdmi_ctrl_is_standby(hdmi_ctrl_is_standby),
+    .debug_signal(debug_signal),
+    .leds(leds)
 );
 `ifndef            __RTL_SIMULATION__
     always@(posedge pix_clk)

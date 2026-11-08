@@ -34,13 +34,14 @@ int main(void){
     while(1){
         set_backgound(addr_buffer[buffer],0);
         print_tilemap(__tilemap__,tile_sprite_to_sdram,tile_sprites_ids,addr_buffer[buffer],250+posix, 0, ___TILEMAP_SIZEX__, ___TILEMAP_SIZEY__, ___TILE_SIZE__ ); 
-        for(int i=0;i<4;i++) copy_sprite_from_sdram_to_buffer(0x0e1100,4096,0x0);
-        for(int i=0;i<5;i++) load_pallet_from_sdram(0xe1000);
+        /*
+        copy_sprite_from_sdram_to_buffer(0x0e1100,4096,0x0);
+        load_pallet_from_sdram(0xe1000);
         
         //render_sprite(0,((320*(30))+posix+(1*80))+addr_buffer[buffer], 64,64,posix+80,30,0,0);
         
         //for(int i=0;i<1;i++) render_sprite(1,((320*(30+posiy))+posix+(2*80))+addr_buffer[buffer], 64,64,posix+2*(80),30+posiy,1,0);
-        
+        */
         copy_sprite_from_sdram_to_buffer(0x0e2100,40*40,0x0);
         load_pallet_from_sdram(0xe2000);
 

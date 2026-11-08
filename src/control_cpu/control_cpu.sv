@@ -50,7 +50,7 @@ always @(posedge clk) begin
         count_to_allow_the_spi_use_mem<=4'h0;
         spi_can_access_memory<=1'b0;
         count_to_allow_the_cpu_use_mem<=4'h0;
-        enable_cpu<=1'b1;
+        enable_cpu<=1'b0;
         leds<=6'b111111;
         state_control_mem_access<=STATE__IDLE;
     end

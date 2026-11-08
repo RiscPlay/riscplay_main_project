@@ -33,7 +33,10 @@ module Pixel_Generator
     input  wire [20:0] fb_horizontal_offset__input,
     output reg         set_addr_to_frame_buffer__ack,
     input  wire [6:0]  n_32bits_words_processed_by_current_hdmi_request,
-    output reg         hdmi_ctrl_is_standby
+    output reg         hdmi_ctrl_is_standby,
+    output reg  [31:0] debug_signal,
+    output reg  [5:0]  leds
+
 ); 
 `define  __LOW_RESOLUTION__
 
@@ -251,6 +254,8 @@ always @(posedge I_pxl_clk ) begin
         set_addr_to_frame_buffer__prev<=1'b0;
         wating_set_framebuffer<=1'b0;
         fb_horizontal_offset<=21'b0;
+        debug_signal<=32'haa;
+        leds<=6'b111111;
     end
     else begin
         set_addr_to_frame_buffer__prev<=set_addr_to_frame_buffer;
@@ -263,6 +268,8 @@ always @(posedge I_pxl_clk ) begin
                 next_addr_to_first_line_of_fb_in_sdram<=addr_to_frame_buffer;
                 set_addr_to_frame_buffer__ack<=1'b1;
                 wating_set_framebuffer<=1'b0;
+                debug_signal<=32'h1ff;
+                leds<=6'b000000;
             end
         end
         else begin

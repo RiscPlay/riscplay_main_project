@@ -105,7 +105,7 @@ function comp___make_program(options) {
             for (var i = this.components_of_type___upload_memory.length - 1; i >= 0; i--) {
                 var comp = this.components_of_type___upload_memory[i];
                 var progress_func = (n) => { if (this.n_words_sent < (n_words_sent_for_previus_components + n)) this.n_words_sent = n_words_sent_for_previus_components + n }
-                await new Promise(resolve => setTimeout(resolve, 3000));
+                await new Promise(resolve => setTimeout(resolve, 30));
                 if (comp.type == COMP___UPLOAD_MEMORY__IS_FILE) {
                     var data_to_send = comp.value;
                     await this.upload_file_to_memory(true, data_to_send, comp.addr, progress_func);
@@ -202,10 +202,7 @@ function comp___make_program(options) {
             for (let i = 0; i < chuncks.length; i++) {
                 var addr_hex = toHex32(addr + (i * 64));
                 try {
-                    var response = await fetch(this.addr_serv + "/send_data", {
-                        method: "POST",
-                        body: addr_hex + chuncks[i]
-                    });
+                    var response = await send_data_to_endpoint_http_or_uart(addr_serv, addr_hex, chuncks[i]);
                 } catch {
                     this.error = true;
                     this.error_msg = "Error to access the endpoint " + this.addr_serv + "/send_data";

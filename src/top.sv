@@ -4,13 +4,14 @@
 //https://github.com/calint/tang-nano-20k--riscv--cache-sdram
 module top (
     `ifndef            __RTL_SIMULATION__
+        output wire  [5:0]  led,
         input              I_rst           ,
         output             O_tmds_clk_p    ,
         output             O_tmds_clk_n    ,
         output      [2:0]  O_tmds_data_p   ,//{r,g,b}
         output      [2:0]  O_tmds_data_n   ,
         
-
+        /******************
         output            ds_clk2,
         input             ds_miso2,
         output            ds_mosi2,
@@ -20,7 +21,7 @@ module top (
         input             ds_miso,
         output            ds_mosi,
         output            ds_cs,
-
+        **************/
 
 
         // "magic" port names that the Gowin EDA connects to the on-chip SDRAM
@@ -178,7 +179,9 @@ HDMI hdmi_inst(
     .set_addr_to_frame_buffer__ack(set_addr_to_frame_buffer__ack),
     .processing_request_from__hdmi_controller(processing_request_from__hdmi_controller),
     .n_32bits_words_processed_by_current_hdmi_request(n_32bits_words_processed_by_current_hdmi_request),
-    .hdmi_ctrl_is_standby(hdmi_ctrl_is_standby)
+    .hdmi_ctrl_is_standby(hdmi_ctrl_is_standby),
+    .debug_signal(debug_signal),
+    .leds(led)
 );
 
 `ifdef __RTL_SIMULATION__
@@ -538,8 +541,8 @@ rv32im_cpu rv32im_cpu_inst(
     .addr_to_frame_buffer(addr_to_frame_buffer),
     .fb_horizontal_offset(fb_horizontal_offset),
     .set_addr_to_frame_buffer__ack(set_addr_to_frame_buffer__ack),
-    .ppu_cmd_fifo_is_empity(ppu_cmd_fifo_is_empity),
-    .debug_signal(debug_signal)
+    .ppu_cmd_fifo_is_empity(ppu_cmd_fifo_is_empity)
+    //.debug_signal(debug_signal)
     //.leds(led)
 
 
@@ -574,7 +577,7 @@ control_cpu control_cpu_ins(
     //.clk_out(clk_cpu)
 );
 
-
+/*************
 reg ps2_dat;
 always @(posedge clk) begin
 	ps2_dat<=ds_miso;
@@ -595,7 +598,7 @@ ps2_controller controller (
 
 );
 
-
+******************/
 
 
 
