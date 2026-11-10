@@ -73,7 +73,9 @@
   <script src="uart.js"></script>
 
   <script>
-    var addr_serv = __UART_ADDR__;
+    var addr_serv = '';
+    var use_websocket=true;
+    const ws = new WebSocket("ws://" + location.host + "/ws");
     function toHex32(value) {
       return (value >>> 0).toString(16).padStart(8, "0");
     }
@@ -174,7 +176,7 @@
         data_to_send = data_to_send + toHex32(data[j])
       }
       try {
-        var response = await send_data_to_endpoint_http_or_uart(addr_serv, addr_hex_to_set_buffer, data_to_send);
+        var response = await send_data_to_endpoint_http_or_websocket_or_uart(addr_serv, addr_hex_to_set_buffer, data_to_send);
         if (response.status != 200) {
           throw new Error("Code " + code + " returned from endpoint: " + addr_serv + "/send_data, the expected is 200");
 
@@ -189,7 +191,7 @@
       var data_to_send = toHex32((addr_sdram << 9) + (data_len << 2) + op_write);
       addr_hex_to_set_buffer = toHex32((1 << 28) + (1 << 22) + (1 << 21));
       try {
-        var response = await send_data_to_endpoint_http_or_uart(addr_serv, addr_hex_to_set_buffer, data_to_send);
+        var response = await send_data_to_endpoint_http_or_websocket_or_uart(addr_serv, addr_hex_to_set_buffer, data_to_send);
         if (response.status != 200) {
           throw new Error("Code " + code + " returned from endpoint: " + addr_serv + "/send_data, the expected is 200");
 
@@ -260,19 +262,43 @@
         byte => parseInt(byte, 16)
       );
     }
-    async function send_data_to_endpoint_http_or_uart(addr_serv, addr_hex, data_hex) {
-      if (addr_serv !== __UART_ADDR__) {
-        try {
-          var response = await fetch(addr_serv + "/send_data", {
-            method: "POST",
-            body: addr_hex + data_hex
-          });
-          return response;
-        }
-        catch {
-          return {
-            "status": 400
+    async function send_data_to_endpoint_http(addr_serv, addr_hex, data_hex){
+      try {
+        var response = await fetch(addr_serv + "/send_data", {
+          method: "POST",
+          body: addr_hex + data_hex
+        });
+        return response;
+      }
+      catch {
+        return {
+          "status": 400
+        };
+      }
+    }
+    function sendMessageUsingWebSocketAndReturnTheResponse(message) {
+
+      return new Promise((resolve, reject) => {
+
+          ws.onmessage = (event) => {
+              resolve(event.data);
           };
+
+          ws.onerror = (error) => {
+              reject(error);
+          };
+
+          ws.send(message);
+        });
+    }
+    async function send_data_to_endpoint_http_or_websocket_or_uart(addr_serv, addr_hex, data_hex) {
+      if (addr_serv !== __UART_ADDR__) {
+        if(use_websocket==false)
+          return await send_data_to_endpoint_http(addr_serv, addr_hex, data_hex);
+        else{ 
+          var ret=await  sendMessageUsingWebSocketAndReturnTheResponse("RECV____"+addr_hex+data_hex);
+          if(ret!="OK") return {"status": 400};
+          else return {"status": 200};
         }
       }
       else {
@@ -323,7 +349,7 @@
           var data_to_send = toHex32((addr_sdram << 9) + (data_len << 2) + op_read);
           var addr_hex_to_set_buffer = toHex32((1 << 28) + (1 << 22) + (1 << 21));
           try {
-            var response = await send_data_to_endpoint_http_or_uart(addr_serv, addr_hex_to_set_buffer, data_to_send);
+            var response = await send_data_to_endpoint_http_or_websocket_or_uart(addr_serv, addr_hex_to_set_buffer, data_to_send);
           } catch {
             this.error = true;
             return;

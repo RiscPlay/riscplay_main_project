@@ -18,7 +18,7 @@ module spi (
     output  wire  [5:0]     leds
 );
 
-`define __USE_UART__COM__
+//`define __USE_UART__COM__
 
 wire finish_calc_crc____for_consumer_spi_mods;
 wire cs;

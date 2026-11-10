@@ -257,7 +257,7 @@ function comp___upload_memory(options) {
 
             for (let i = 0; i < chuncks.length; i++) {
                 var addr_hex = toHex32(addr + (i * 64));
-                response = await send_data_to_endpoint_http_or_uart(addr_serv, addr_hex, chuncks[i]);
+                response = await send_data_to_endpoint_http_or_websocket_or_uart(addr_serv, addr_hex, chuncks[i]);
                 var code = response.status;
                 if (code != 200) {
                     this.error_msg = "Code " + response.code + " returned from endpoint: " + this.addr_serv + "/send_data, the expected is 200";
